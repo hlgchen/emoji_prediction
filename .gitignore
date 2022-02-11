@@ -1,3 +1,5 @@
 emoji_embedding/data/emojipedia/
 emoji_embedding/data/hotemoji_description_raw.csv
 *.DS_Store
+*-checkpoint.py
+*-checkpoint.ipynb
