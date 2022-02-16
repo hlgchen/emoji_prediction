@@ -103,11 +103,16 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs):
         )
         print("-" * 10)
         if epoch % 5 == 0:
+            base = os.path.join(
+                utils.get_project_root(), f"emoji_embedding/model/vision/"
+            )
+            if not os.path.exists(base):
+                os.makedirs(base)
             torch.save(
                 model.state_dict(),
                 os.path.join(
-                    utils.get_project_root(),
-                    f"emoji_embedding/model/vision/res18_epoch{epoch}.ckpt",
+                    base,
+                    f"/res18_epoch{epoch}.ckpt",
                 ),
             )
 
