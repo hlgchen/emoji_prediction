@@ -5,3 +5,4 @@ Pillow==9.0.1
 scikit_image
 torch
 torchvision
+tqdm

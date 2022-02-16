@@ -9,7 +9,7 @@ from emoji_images import EmojiImageDataset
 from cnn import ResnetExt
 import utils
 import os
-
+from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -55,28 +55,30 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs):
             running_loss = 0.0
             running_corrects = 0
 
-            for i, (X, y) in enumerate(dataloaders[phase]):
-                start_time_batch = time()
+            with tqdm(enumerate(dataloaders[phase])) as tbatch:
+                for i, (X, y) in tbatch:
+                    start_time_batch = time()
 
-                X = X.to(device)
-                y = y.to(device).long()
+                    X = X.to(device)
+                    y = y.to(device).long()
 
-                with torch.set_grad_enabled(phase == "train"):
-                    optimizer.zero_grad()
-                    outputs = model(X)
-                    loss = criterion(outputs, y.squeeze(-1))
-                    if phase == "train":
-                        loss.backward()
-                        optimizer.step()
+                    with torch.set_grad_enabled(phase == "train"):
+                        optimizer.zero_grad()
+                        outputs = model(X)
+                        loss = criterion(outputs, y.squeeze(-1))
+                        if phase == "train":
+                            loss.backward()
+                            optimizer.step()
 
-                _, y_pred = torch.max(outputs, 1)
+                    _, y_pred = torch.max(outputs, 1)
 
-                # statistics
-                running_loss += loss.item() * y_pred.size(0)
-                running_corrects += torch.sum(y_pred == y.data)
-                print(
-                    f"batch {i}/{len(dataloaders[phase])} finished, loss is {running_loss/(i+1)}, took {time()- start_time_batch}"
-                )
+                    # statistics
+                    running_loss += loss.item() * y_pred.size(0)
+                    running_corrects += torch.sum(y_pred == y.data)
+                    tbatch.set_postfix(
+                        loss=loss.item() * y_pred.size(0),
+                        running_loss=running_loss / (i + 1),
+                    )
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
             epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
