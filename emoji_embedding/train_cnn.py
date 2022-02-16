@@ -112,9 +112,10 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs):
                 model.state_dict(),
                 os.path.join(
                     base,
-                    f"/res18_epoch{epoch}.ckpt",
+                    f"res18_epoch{epoch}.ckpt",
                 ),
             )
+            print("model saved")
 
     time_elapsed = time() - start_time_training
     print(
@@ -149,5 +150,5 @@ if __name__ == "__main__":
         dataloaders=dataloaders,
         criterion=criterion,
         optimizer=optimizer,
-        num_epochs=25,
+        num_epochs=42,
     )
