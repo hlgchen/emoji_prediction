@@ -184,26 +184,16 @@ class Rescale(object):
         return img
 
 
-def plot(samples):
-    """Plot some examples from a dataset.
-    Note that the images have been normalized"""
+def plot(sample):
+    """Plot sample from dataset"""
     fig = plt.figure()
-    for i in range(len(samples)):
-        sample = samples[i]
+    print(sample[0].shape, sample[1].shape)
+    ax = plt.subplot()
+    plt.tight_layout()
+    ax.set_title(sample[1])
+    ax.axis("off")
 
-        print(i, sample[0].shape, sample[1].shape)
-
-        ax = plt.subplot(1, 4, i + 1)
-        plt.tight_layout()
-        ax.set_title(sample[1])
-        ax.axis("off")
-
-        plt.imshow(sample[0].permute(1, 2, 0))
-        plt.pause(0.001)  # pause a bit so that plots are updated
-
-        if i == 3:
-            plt.show()
-            break
+    plt.imshow(sample[0].permute(1, 2, 0))
 
 
 if __name__ == "__main__":
