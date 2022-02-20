@@ -108,7 +108,7 @@ def split_data(valid_num=1, test_num=0, seed=1):
     df_train.to_csv(paths["meta_train_path"], index=False)
 
 
-class EmojiImageDataset(Dataset):
+class EmojiClassificationDataset(Dataset):
     def __init__(self, dataset_type="", img_size=224):
         """
         Creates emoji Dataset.
@@ -205,5 +205,5 @@ if __name__ == "__main__":
     prepare_meta_data()
     split_data()
 
-    train_data = EmojiImageDataset("train")
-    valid_data = EmojiImageDataset("valid")
+    train_data = EmojiClassificationDataset("train")
+    valid_data = EmojiClassificationDataset("valid")

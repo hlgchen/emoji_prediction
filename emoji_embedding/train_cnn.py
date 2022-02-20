@@ -5,7 +5,7 @@ import copy
 
 from torch.utils.data import DataLoader
 
-from emoji_images import EmojiImageDataset
+from emoji_images import EmojiClassificationDataset
 from cnn import ResnetExt
 import utils
 import os
@@ -132,8 +132,8 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs):
 
 if __name__ == "__main__":
 
-    train_data = EmojiImageDataset("train")
-    valid_data = EmojiImageDataset("valid")
+    train_data = EmojiClassificationDataset("train")
+    valid_data = EmojiClassificationDataset("valid")
     train_data_loader = DataLoader(train_data, batch_size=64, shuffle=True)
     valid_data_loader = DataLoader(valid_data, batch_size=64, shuffle=True)
     dataloaders = {"train": train_data_loader, "valid": valid_data_loader}
