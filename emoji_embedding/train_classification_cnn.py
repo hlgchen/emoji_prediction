@@ -5,8 +5,8 @@ import copy
 
 from torch.utils.data import DataLoader
 
-from emoji_images import EmojiImageDescriptionDataset
-from cnn import Img2Vec, ContrastiveLoss
+from emoji_images import EmojiClassificationDataset
+from cnn import ResnetExtClassifier
 import utils
 import os
 from tqdm import tqdm
@@ -14,9 +14,7 @@ from tqdm import tqdm
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def train_model(
-    model, dataloaders, criterion, optimizer, num_epochs, name="semi_siamese"
-):
+def train_model(model, dataloaders, criterion, optimizer, num_epochs):
     """
     Trains model with specified setup. Models are saved avery 5 epoch.
     Returns the model with best evaluation performance.
@@ -58,26 +56,16 @@ def train_model(
             running_corrects = 0
 
             with tqdm(enumerate(dataloaders[phase])) as tbatch:
-                for i, batch in tbatch:
+                for i, (X, y) in tbatch:
                     start_time_batch = time()
 
-                    X = batch["image"]
                     X = X.to(device)
-                    X = X.view(-1, *X.shape[2:])
-
-                    Xd = batch["description"]
-                    Xd = Xd.to(device)
-                    Xd = Xd.view(-1, *Xd.shape[2:]).unsqueeze(1)
-
-                    y = batch["label"]
-                    y = y.to(device)
-                    y = y.view(-1, *y.shape[2:]).long()
+                    y = y.to(device).long()
 
                     with torch.set_grad_enabled(phase == "train"):
                         optimizer.zero_grad()
-                        img_embeddings = model(X).unsqueeze(-1)
-                        outputs = torch.bmm(Xd, img_embeddings).squeeze()
-                        loss = criterion(outputs, y)
+                        outputs = model(X)
+                        loss = criterion(outputs, y.squeeze(-1))
                         if phase == "train":
                             loss.backward()
                             optimizer.step()
@@ -116,7 +104,7 @@ def train_model(
         print("-" * 10)
         if epoch % 5 == 0:
             base = os.path.join(
-                utils.get_project_root(), f"emoji_embedding/model/vision_{name}/"
+                utils.get_project_root(), f"emoji_embedding/model/vision/"
             )
             if not os.path.exists(base):
                 os.makedirs(base)
@@ -124,7 +112,7 @@ def train_model(
                 model.state_dict(),
                 os.path.join(
                     base,
-                    f"res18_{name}_epoch{epoch}.ckpt",
+                    f"res18_epoch{epoch}.ckpt",
                 ),
             )
             print("model saved")
@@ -144,16 +132,17 @@ def train_model(
 
 if __name__ == "__main__":
 
-    train_data = EmojiImageDescriptionDataset("train", num_neg_sample=4)
-    valid_data = EmojiImageDescriptionDataset("valid", num_neg_sample=4)
-    train_data_loader = DataLoader(train_data, batch_size=32, shuffle=True)
-    valid_data_loader = DataLoader(valid_data, batch_size=32, shuffle=True)
+    train_data = EmojiClassificationDataset("train")
+    valid_data = EmojiClassificationDataset("valid")
+    train_data_loader = DataLoader(train_data, batch_size=64, shuffle=True)
+    valid_data_loader = DataLoader(valid_data, batch_size=64, shuffle=True)
     dataloaders = {"train": train_data_loader, "valid": valid_data_loader}
 
-    model = Img2Vec(emb_dimension=200)
+    model = ResnetExtClassifier(num_classes=1710, emb_dimension=300)
     model.to(device)
+    # utils.model_summary(model)
 
-    criterion = ContrastiveLoss()
+    criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters())
 
     train_model(

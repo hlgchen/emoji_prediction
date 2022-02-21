@@ -4,5 +4,5 @@ emoji_embedding/data/hotemoji_description_raw.csv
 *-checkpoint.py
 *-checkpoint.ipynb
 *.pyc
-emoji_embedding/model/vision
+emoji_embedding/model/vision_classification
 emoji_embedding/data/emojipedia.zip
