@@ -1,3 +1,4 @@
+gensim
 matplotlib
 numpy
 pandas
