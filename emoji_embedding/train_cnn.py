@@ -96,7 +96,7 @@ def train_model(
             )
 
             if phase == "valid" and epoch_loss < best_loss:
-                best_acc = epoch_loss
+                best_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
 
         time_elapsed = time() - start_time_epoch
@@ -127,7 +127,7 @@ def train_model(
             time_elapsed // 60, time_elapsed % 60
         )
     )
-    print("Best valid Acc: {:4f}".format(best_acc))
+    print("Best valid Acc: {:4f}".format(best_loss))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
