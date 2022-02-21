@@ -38,9 +38,8 @@ def train_model(
     """
     start_time_training = time()
 
-    val_acc_history = []
     best_model_wts = copy.deepcopy(model.state_dict())
-    best_acc = 0.0
+    best_loss = 0.0
 
     for epoch in range(num_epochs):
         start_time_epoch = time()
@@ -55,7 +54,6 @@ def train_model(
                 model.eval()  # Set model to evaluate mode
 
             running_loss = 0.0
-            running_corrects = 0
 
             with tqdm(enumerate(dataloaders[phase])) as tbatch:
                 for i, batch in tbatch:
@@ -82,30 +80,24 @@ def train_model(
                             loss.backward()
                             optimizer.step()
 
-                    _, y_pred = torch.max(outputs, 1)
-
                     # statistics
-                    running_loss += loss.item() * y_pred.size(0)
-                    running_corrects += torch.sum(y_pred == y.data)
+                    running_loss += loss.item() * y.size(0)
                     tbatch.set_postfix(
-                        loss=loss.item() * y_pred.size(0),
+                        loss=loss.item() * y.size(0),
                         running_loss=running_loss / (i + 1),
                     )
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
-            epoch_acc = running_corrects.double() / len(dataloaders[phase].dataset)
 
             print(
-                "{} Loss: {:.4f} Acc: {:.4f}, took {}".format(
-                    phase, epoch_loss, epoch_acc, time() - start_time_batch
+                "{} Loss: {:.4f}, took {}".format(
+                    phase, epoch_loss, time() - start_time_batch
                 )
             )
 
-            if phase == "valid" and epoch_acc > best_acc:
-                best_acc = epoch_acc
+            if phase == "valid" and epoch_loss < best_loss:
+                best_acc = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
-            if phase == "valid":
-                val_acc_history.append(epoch_acc)
 
         time_elapsed = time() - start_time_epoch
         print(
@@ -139,7 +131,7 @@ def train_model(
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return model, val_acc_history
+    return model
 
 
 if __name__ == "__main__":
