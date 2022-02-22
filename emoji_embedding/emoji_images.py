@@ -301,8 +301,9 @@ class EmojiImageDescriptionDataset(Dataset):
         )[["path", "emjpd_description_main", "emjpd_emoji_name_og", "emjpd_aliases"]]
         self.scale = Rescale(img_size)
 
-        sentences = self.df.emjpd_emoji_name_og + " " + self.df.emjpd_description_main
-        self.embeddings = calculate_word2vec_embeddings(sentences, emb_model=emb_model)
+        name_embeddings = calculate_word2vec_embeddings(self.df.emjpd_emoji_name_og)
+        sent_embeddings = calculate_word2vec_embeddings(self.df.emjpd_description_main)
+        self.embeddings = (name_embeddings + sent_embeddings) / 2
         self.num_neg_sample = num_neg_sample
         np.random.seed(seed)
         print("finished")

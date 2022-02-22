@@ -40,6 +40,7 @@ def train_model(
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 0.0
+    cossim = nn.CosineSimilarity()
 
     for epoch in range(num_epochs):
         start_time_epoch = time()
@@ -74,7 +75,7 @@ def train_model(
                     with torch.set_grad_enabled(phase == "train"):
                         optimizer.zero_grad()
                         img_embeddings = model(X).unsqueeze(-1)
-                        outputs = -torch.bmm(Xd, img_embeddings).squeeze()
+                        outputs = 1 - cossim(Xd, img_embeddings)
                         loss = criterion(outputs, y)
                         if phase == "train":
                             loss.backward()
@@ -136,8 +137,8 @@ def train_model(
 
 if __name__ == "__main__":
 
-    train_data = EmojiImageDescriptionDataset("train", num_neg_sample=4)
-    valid_data = EmojiImageDescriptionDataset("valid", num_neg_sample=4)
+    train_data = EmojiImageDescriptionDataset("train", num_neg_sample=9)
+    valid_data = EmojiImageDescriptionDataset("valid", num_neg_sample=9)
     train_data_loader = DataLoader(train_data, batch_size=32, shuffle=True)
     valid_data_loader = DataLoader(valid_data, batch_size=32, shuffle=True)
     dataloaders = {"train": train_data_loader, "valid": valid_data_loader}
@@ -145,7 +146,7 @@ if __name__ == "__main__":
     model = Img2Vec(emb_dimension=200)
     model.to(device)
 
-    criterion = ContrastiveLoss()
+    criterion = ContrastiveLoss(margin=1.0)
     optimizer = torch.optim.Adam(model.parameters())
 
     train_model(
