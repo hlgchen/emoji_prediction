@@ -74,7 +74,7 @@ def train_model(
                     with torch.set_grad_enabled(phase == "train"):
                         optimizer.zero_grad()
                         img_embeddings = model(X).unsqueeze(-1)
-                        outputs = torch.bmm(Xd, img_embeddings).squeeze()
+                        outputs = -torch.bmm(Xd, img_embeddings).squeeze()
                         loss = criterion(outputs, y)
                         if phase == "train":
                             loss.backward()
