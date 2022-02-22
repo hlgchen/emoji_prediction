@@ -16,7 +16,7 @@ import re
 from utils import get_project_root
 
 
-def prepare_meta_data(zero_shot_config=100, seed=100):
+def prepare_meta_data(must_have_zero_shot=[], zero_shot_config=100, seed=100):
     """
     Saves the image folder structure in a pandas Dataframe and splits
     the images in training and zeroshot data.
@@ -28,6 +28,7 @@ def prepare_meta_data(zero_shot_config=100, seed=100):
     emojis, that are to be used during testing of zero shot capabilities.
 
     Params:
+        - must_have_zero_shot {list}: list of emojis that have to be in zero shot set
         - zero_shot_config {int/list}: integer specifying number of emojis in zero-shot
                                         test set, or list of particular emojis that are
                                         to be put in the test set.
@@ -52,9 +53,14 @@ def prepare_meta_data(zero_shot_config=100, seed=100):
 
     if isinstance(zero_shot_config, int):
         np.random.seed(seed)
-        selection = np.random.choice(df.label.unique(), zero_shot_config)
+        selection = (
+            np.random.choice(
+                df.label.unique(), zero_shot_config - len(must_have_zero_shot)
+            ).tolist()
+            + must_have_zero_shot
+        )
     else:
-        selection = zero_shot_config
+        selection = zero_shot_config + must_have_zero_shot
 
     df_zero = df.loc[df.label.isin(selection)]
     df_train = df.loc[~df.label.isin(selection)]
@@ -366,8 +372,20 @@ if __name__ == "__main__":
     Splits data into embedding training data and zero-shot data.
     Then splits embedding training data into training and validation data.
     """
+    zero_shot_emoji_must_have = [
+        "flushed_face",
+        "backhand_index_pointing_right",
+        "raising_hands",
+        "male_sign",
+        "sparkling_heart",
+        "female_sign",
+        "person_shrugging",
+        "smiling_face",
+        "flexed_biceps",
+        "collision",
+    ]
 
-    prepare_meta_data()
+    prepare_meta_data(zero_shot_emoji_must_have)
     split_data()
 
     train_data = EmojiClassificationDataset("train")
