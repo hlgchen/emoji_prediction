@@ -66,7 +66,7 @@ def train_model(
 
                     Xd = batch["description"]
                     Xd = Xd.to(device)
-                    Xd = Xd.view(-1, *Xd.shape[2:]).unsqueeze(1)
+                    Xd = Xd.view(-1, *Xd.shape[2:])
 
                     y = batch["label"]
                     y = y.to(device)
@@ -74,7 +74,7 @@ def train_model(
 
                     with torch.set_grad_enabled(phase == "train"):
                         optimizer.zero_grad()
-                        img_embeddings = model(X).unsqueeze(-1)
+                        img_embeddings = model(X)
                         outputs = 1 - cossim(Xd, img_embeddings)
                         loss = criterion(outputs, y)
                         if phase == "train":
