@@ -6,5 +6,6 @@ emoji_embedding/data/hotemoji_description_raw.csv
 *.pyc
 emoji_embedding/model/vision_classification
 emoji_embedding/model/vision_semi_siamese
+emoji_embedding/model/emoji_image_embedding
 emoji_embedding/data/emojipedia.zip
 *checkpoint*
