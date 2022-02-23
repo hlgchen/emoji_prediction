@@ -36,7 +36,7 @@ def prepare_meta_data(must_have_zero_shot=[], zero_shot_config=100, seed=100):
     """
     img_path = "data/emojipedia/"
     out_train_path = "data/meta/img_meta.csv"
-    out_zero_path = "data/meta/zero_shot_meta.csv"
+    out_zero_path = "data/meta/img_meta_zeroshot.csv"
     if os.getcwd().split("/")[-1] == "emoji_prediction":
         img_path = os.path.join("emoji_embedding", img_path)
         out_train_path = os.path.join("emoji_embedding", out_train_path)
@@ -159,13 +159,14 @@ class EmojiClassificationDataset(Dataset):
         - img_size {int}: height and width of the images in the dataset
     """
 
-    def __init__(self, dataset_type="", img_size=224):
+    def __init__(self, dataset_type="", img_size=224, label_flag=True):
         path_suffix = "_" + dataset_type
         meta_path = f"emoji_embedding/data/meta/img_meta{path_suffix}.csv"
         meta_path = os.path.join(get_project_root(), meta_path)
         self.project_root = get_project_root()
         self.df = pd.read_csv(meta_path)
         self.scale = Rescale(img_size)
+        self.label = label_flag
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
@@ -185,9 +186,12 @@ class EmojiClassificationDataset(Dataset):
             ]
         )
         input_tensor = preprocess(input_image)
-        label = self.df.iloc[idx, 2]  # corresponds to column class in dataframe
-        label = torch.Tensor([label])
-        return input_tensor, label
+        if self.label: 
+            label = self.df.iloc[idx, 2]  # corresponds to column class in dataframe
+            label = torch.Tensor([label])
+            return input_tensor, label
+        else: 
+            return input_tensor
 
     def __len__(self):
         return len(self.df)
