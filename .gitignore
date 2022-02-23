@@ -7,3 +7,4 @@ emoji_embedding/data/hotemoji_description_raw.csv
 emoji_embedding/model/vision_classification
 emoji_embedding/model/vision_semi_siamese
 emoji_embedding/data/emojipedia.zip
+*checkpoint*
