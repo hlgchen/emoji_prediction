@@ -7,5 +7,10 @@ emoji_embedding/data/hotemoji_description_raw.csv
 emoji_embedding/model/vision_classification
 emoji_embedding/model/vision_semi_siamese
 emoji_embedding/model/emoji_image_embedding
+emoji_embedding/model/emoji_image_embedding_training
 emoji_embedding/data/emojipedia.zip
+
+twemoji/raw_data
+twemoji/unfiltered_processed
+twemoji/processed_data
 *checkpoint*
