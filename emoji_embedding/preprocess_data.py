@@ -1,35 +1,331 @@
 import os
+import json
 import pandas as pd
 import numpy as np
-import json
+
 from utils import get_project_root
 
+# ************************ preprocess hotemoji data ********************************
+def decode(description):
+    try:  # data was scrapped as a byte representation string, need to convert to utf-8
+        description = description.encode("latin-1").decode("utf-8")
+        if "📑" in description:
+            description = description.split("📑")[0]
+        return description
+    except:
+        return description
 
-def prepare_meta_data(must_have_zero_shot=[], zero_shot_config=100, seed=100):
-    """
-    Saves the image folder structure in a pandas Dataframe and splits
-    the images in training and zeroshot data.
 
-    For each emoji several images are saved in the same folder. For each image
-    the path to it as well as the emoji type is saved in the pandas Dataframe.
-    The path saved is relative to the project root.
-    Subsequently the emoji types are split in training (for embedding) and zero-shot
-    emojis, that are to be used during testing of zero shot capabilities.
+def preprocess_hotemoji_data(save_path=None):
+    read_path = os.path.join(
+        get_project_root(),
+        "emoji_embedding",
+        "data/hotemoji/hotemoji_description_raw.csv",
+    )
+    hemj_df = (
+        pd.read_csv(read_path)
+        .dropna(subset=["emoji_char"])
+        .rename(
+            columns={
+                "emoji_char": "emoji_char_bytes",
+                "emoji_name": "hemj_emoji_name_og",
+                "emoji_description": "hemj_emoji_description",
+            }
+        )
+    )
 
-    Params:
-        - must_have_zero_shot {list}: list of emojis that have to be in zero shot set
-        - zero_shot_config {int/list}: integer specifying number of emojis in zero-shot
-                                        test set, or list of particular emojis that are
-                                        to be put in the test set.
-        - seed {int}: random seed fro split
-    """
+    hemj_df["emoji_char"] = hemj_df.emoji_char_bytes.apply(
+        lambda x: x.encode("latin-1").decode(
+            "utf-8"
+        )  # data was scrapped as a byte representation string
+    )
+    hemj_df["emoji_char_ascii"] = hemj_df.emoji_char.apply(
+        lambda x: x.encode("unicode-escape").decode("ASCII")
+    )
+
+    hemj_df["hemj_emoji_name"] = hemj_df.hemj_emoji_name_og.str.lower().str.replace(
+        " ", "_"
+    )
+
+    hemj_df.hemj_emoji_description = hemj_df.hemj_emoji_description.apply(decode)
+    hemj_df = hemj_df.drop_duplicates()
+
+    if save_path is not None:
+        save_path = os.path.join(get_project_root(), "emoji_embedding", save_path)
+        hemj_df.to_csv(save_path, index=False)
+
+    return hemj_df
+
+
+# ************************ preprocess emojipedia data ********************************
+
+
+def get_reference_emojis(description, emoji_set):
+    """Function that is used in pandas apply for each row.
+    Returns list of emojis that are referenced in a description."""
+    return [ref for ref in emoji_set if ref in description]
+
+
+def get_usage(description):
+    """Function that is used in pandas apply for each row.
+    Returns string with sentences that contain "used" but not "used by/to" """
+    result = "\n".join(
+        [
+            line
+            for line in description.split("\n")
+            if ("used" in line) & ("used by" not in line) & ("used to" not in line)
+        ]
+    )
+    if len(result) > 0:
+        return result
+    else:
+        return None
+
+
+def split_description(description):
+    """Function that is used in pandas apply for each row.
+    Splits description into main and meta information part.
+    The "side_text" contains information such as introduction year of emoji"""
+    description_ls = description.split("\n")
+    empty_counter = 0
+    for i, t in enumerate(description_ls[::-1]):
+        if t == "":
+            empty_counter += 1
+        if empty_counter == 2:
+            break
+    main_text = "\n".join([t for t in description_ls[:-i] if t != ""])
+    side_text = "\n".join([t for t in description_ls[-i:] if t != ""])
+    return pd.Series([main_text, side_text])
+
+
+def preprocess_emojipedia_data(save_path=None):
+    read_path = os.path.join(
+        get_project_root(),
+        "emoji_embedding",
+        "data/emojipedia/",
+    )
+    emjpd_dict = dict()
+    for path, subdirs, _ in os.walk(read_path):
+        for sub in subdirs:
+            for f in os.listdir(os.path.join(path, sub)):
+                if f[-4:] == "json":
+                    with open(os.path.join(path, sub, f), "r") as f:
+                        emjpd_dict[sub] = json.load(f)
+
+    df = pd.DataFrame()
+    df["emoji_char"] = [v["emoji_char"] for v in emjpd_dict.values()]
+    df["emoji_char_ascii"] = df.emoji_char.apply(
+        lambda x: x.encode("unicode-escape").decode("ASCII")
+    )
+    df["emjpd_emoji_name"] = emjpd_dict.keys()
+    df["emjpd_emoji_name_og"] = [v["emoji"] for v in emjpd_dict.values()]
+    df["emjpd_aliases"] = [v["aliases"] for v in emjpd_dict.values()]
+    df["emjpd_full_description"] = [v["description"] for v in emjpd_dict.values()]
+    df.emjpd_full_description = df.emjpd_full_description.str.replace(
+        "\xa0", " "
+    )  # remove nonbreaking space
+    df["emjpd_shortcodes"] = [v.get("shortcodes", []) for v in emjpd_dict.values()]
+
+    emoji_set = set(df.emoji_char.tolist())
+    df["emjpd_description_ref_emj"] = df.emjpd_full_description.apply(
+        lambda x: get_reference_emojis(x, emoji_set)
+    )
+    df["emjpd_usage_info"] = df.emjpd_full_description.apply(get_usage)
+    df[
+        ["emjpd_description_main", "emjpd_description_side"]
+    ] = df.emjpd_full_description.apply(split_description)
+
+    if save_path is not None:
+        save_path = os.path.join(get_project_root(), "emoji_embedding", save_path)
+        df.to_csv(save_path, index=False)
+
+    return df
+
+
+# ************************ merge datasets ********************************
+
+
+def merge_emoji_datasets(df, hemj_df, save_path):
+    mdf = df.merge(hemj_df, how="left", on=["emoji_char", "emoji_char_ascii"])
+    mdf = mdf.rename(columns={"emjpd_emoji_name": "emoji_name"})
+    mdf["emoji_char_ascii_beg"] = mdf.emoji_char_ascii.apply(
+        lambda x: "\\" + [y for y in x.split("\\") if len(y) > 0][0]
+    )
+
+    for col in [
+        "emoji_name",
+        "emjpd_emoji_name_og",
+        "emjpd_full_description",
+        "emjpd_description_main",
+        "emjpd_description_side",
+        "hemj_emoji_description",
+        "emjpd_usage_info",
+    ]:
+        mdf[col] = mdf[col].str.lower()
+
+    mdf["emjpd_aliases"] = mdf["emjpd_aliases"].apply(
+        lambda x: [s.lower() for s in x] if isinstance(x, list) else []
+    )
+
+    cols = [
+        "emoji_char",  # emoji-symbol/picture
+        "emoji_name",  # emojipedia emoji name processed
+        "emoji_char_ascii",  # emoji expressed in ascii
+        "emoji_char_ascii_beg",  # the first emoji part expressed as ascii
+        "emjpd_emoji_name_og",  # emojipedia emoji name
+        "emjpd_aliases",  # emojipedia aliases for emoji
+        "emjpd_shortcodes",  # emojipedia shortcuts for slack/github etc.
+        "emjpd_full_description",  # emojipedia all description data scraped unprocessed in utf-8
+        "emjpd_description_main",  # emojipedia main description without meta data at bottom
+        "emjpd_description_side",  # emojipedia meta data about emoji (when was the emoji introduced)
+        "hemj_emoji_description",  # hotemoji description scaraped utf-8
+        "emjpd_usage_info",  # emojipedia sentences with how an emoji is used (contains "used" but not "used to/by")
+        "emjpd_description_ref_emj",  # emojipedia emojis that are referrenced within the description in some way
+    ]
+
+    mdf = mdf[cols]
+
+    save_path = os.path.join(get_project_root(), "emoji_embedding", save_path)
+    mdf.to_csv(save_path, index=False)
+
+
+# ************************ get_keys ********************************
+
+
+def get_zeroshot_emojis():
+    """Returns hard coded list of emojis that are in the embedding image zero shot set"""
+    ls = [
+        "muted_speaker",
+        "palm_tree",
+        "lipstick",
+        "person_golfing",
+        "waxing_crescent_moon",
+        "movie_camera",
+        "sports_medal",
+        "skis",
+        "speaking_head",
+        "woman_facepalming",
+        "eye_in_speech_bubble",
+        "flag-_tokelau",
+        "medical_symbol",
+        "woman_detective",
+        "flat_shoe",
+        "sauropod",
+        "flag-_burundi",
+        "raising_hands",
+        "smiling_face_with_hearts",
+        "face_with_open_mouth",
+        "sparkling_heart",
+        "martial_arts_uniform",
+        "family-_man,_woman,_boy",
+        "backhand_index_pointing_right",
+        "mage",
+        "person_taking_bath",
+        "passenger_ship",
+        "male_sign",
+        "telescope",
+        "flag-_slovakia",
+        "smiling_face",
+        "man_mage",
+        "computer_mouse",
+        "woman_bowing",
+        "woman_gesturing_no",
+        "firefighter",
+        "monorail",
+        "trumpet",
+        "person_in_manual_wheelchair",
+        "pool_8_ball",
+        "waffle",
+        "victory_hand",
+        "potable_water",
+        "one-thirty",
+        "keycap_digit_two",
+        "flag-_bouvet_island",
+        "flag-_timor-leste",
+        "soon_arrow",
+        "weary_face",
+        "flag-_åland_islands",
+        "woman_pouting",
+        "minibus",
+        "department_store",
+        "wolf",
+        "railway_car",
+        "female_sign",
+        "sheaf_of_rice",
+        "flag-_china",
+        "receipt",
+        "horizontal_traffic_light",
+        "flag-_british_indian_ocean_territory",
+        "flexed_biceps",
+        "1st_place_medal",
+        "b_button_(blood_type)",
+        "black_small_square",
+        "cloud",
+        "ferry",
+        "fast-forward_button",
+        "woman_supervillain",
+        "train",
+        "bikini",
+        "broccoli",
+        "left_luggage",
+        "no_mobile_phones",
+        "two_hearts",
+        "flag-_panama",
+        "person_shrugging",
+        "family-_woman,_woman,_girl",
+        "hedgehog",
+        "flag-_egypt",
+        "outbox_tray",
+        "enraged_face",
+        "bacon",
+        "deaf_woman",
+        "person_wearing_turban",
+        "last_quarter_moon",
+        "flushed_face",
+        "flag-_cocos_(keeling)_islands",
+        "lying_face",
+        "flag-_isle_of_man",
+        "safety_pin",
+        "chart_increasing",
+        "sparkle",
+        "elf",
+        "crescent_moon",
+        "umbrella_with_rain_drops",
+        "collision",
+        "fish_cake_with_swirl",
+        "nut_and_bolt",
+    ]
+    return ls
+
+
+def get_keys(zero_shot_emojis, save_path):
+    """ """
+    description_path = "data/processed/emoji_descriptions.csv"
+    description_path = os.path.join(
+        get_project_root(), "emoji_embedding", description_path
+    )
+    df = pd.read_csv(description_path)[
+        ["emoji_name", "emoji_char_ascii", "emoji_char_ascii_beg"]
+    ]
+    df["zero_shot"] = df.emoji_name.apply(lambda x: x in zero_shot_emojis)
+
+    save_path = os.path.join(get_project_root(), "emoji_embedding", save_path)
+    df.to_csv(save_path, index=False)
+
+    return df
+
+
+# ************************ split datasets ********************************
+
+
+def prepare_meta_data(key_df, out_path, seed=1):
+
+    """ """
+
+    np.random.seed(seed)
     img_path = "data/emojipedia/"
-    out_train_path = "data/meta/img_meta.csv"
-    out_zero_path = "data/meta/img_meta_zeroshot.csv"
-    if os.getcwd().split("/")[-1] == "emoji_prediction":
-        img_path = os.path.join("emoji_embedding", img_path)
-        out_train_path = os.path.join("emoji_embedding", out_train_path)
-        out_zero_path = os.path.join("emoji_embedding", out_zero_path)
+    img_path = os.path.join(get_project_root(), "emoji_embedding", img_path)
+
     img_paths = []
     img_labels = []
     for path, subdirs, _ in os.walk(img_path):
@@ -38,92 +334,26 @@ def prepare_meta_data(must_have_zero_shot=[], zero_shot_config=100, seed=100):
                 if f[-3:] == "jpg":
                     img_paths.append(os.path.join(path, sub, f))
                     img_labels.append(sub)
-    df = pd.DataFrame({"path": img_paths, "label": img_labels})
+    df = pd.DataFrame({"path": img_paths, "emoji_name": img_labels})
 
-    if isinstance(zero_shot_config, int):
-        np.random.seed(seed)
-        selection = (
-            np.random.choice(
-                df.label.unique(), zero_shot_config - len(must_have_zero_shot)
-            ).tolist()
-            + must_have_zero_shot
-        )
-    else:
-        selection = zero_shot_config + must_have_zero_shot
+    df = df.merge(key_df[["emoji_name", "zero_shot"]])
 
-    df_zero = df.loc[df.label.isin(selection)]
-    df_train = df.loc[~df.label.isin(selection)]
+    df["dataset_type"] = "train"
+    valid_index = df.groupby("emoji_name").sample(1).index
+    df.loc[valid_index, "dataset_type"] = "valid"
+    df.dataset_type = df.dataset_type.where(df.zero_shot == False, "zero")
 
-    df_train.to_csv(out_train_path, index=False)
-    df_zero.to_csv(out_zero_path, index=False)
-
-
-def split_data(valid_num=1, test_num=0, seed=1):
-    """
-    Splits the (emojipedia embedding) training data (that is data exluding the zero shot data)
-    into training, validation and test data. Saves each of those tables seperately.
-    The split is specified via the number of images for each emoji type that are to be put
-    in validation/test.
-
-    Params:
-        - valid_num {int}: number of images for each emoji in validation set
-        - test_num {int}: number of images for each emoji in test set
-        - seed {int}: random seed for reproducivility
-    """
-    np.random.seed(seed)
-
-    paths = dict()
-    paths["meta_path"] = "emoji_embedding/data/meta/img_meta.csv"
-    paths["meta_train_path"] = "emoji_embedding/data/meta/img_meta_train.csv"
-    paths["meta_valid_path"] = "emoji_embedding/data/meta/img_meta_valid.csv"
-    paths["meta_test_path"] = "emoji_embedding/data/meta/img_meta_test.csv"
-    paths["meta_emoji_idx"] = "emoji_embedding/data/meta/emoji_idx.json"
-    paths["meta_idx_emoji"] = "emoji_embedding/data/meta/idx_emoji.json"
-
-    for k, v in paths.items():
-        paths[k] = os.path.join(get_project_root(), v)
-
-    df_train = pd.read_csv(paths["meta_path"])
-    emoji_idx = {k: v for v, k in enumerate(df_train.label.unique())}
-    idx_emoji = {v: k for k, v in emoji_idx.items()}
-    df_train["class"] = df_train.label.apply(lambda x: emoji_idx[x])
-    print(f"number of unique classes: {df_train.label.nunique()}")
-    with open(paths["meta_emoji_idx"], "w") as f:
-        json.dump(emoji_idx, f)
-    with open(paths["meta_idx_emoji"], "w") as f:
-        json.dump(idx_emoji, f)
-
-    if valid_num > 0:
-        df_valid = df_train.groupby(by="label").sample(valid_num, replace=True)
-        df_train = df_train.drop(df_valid.index)
-        df_valid.to_csv(paths["meta_valid_path"], index=False)
-    if test_num > 0:
-        df_test = df_train.groupby(by="label").sample(test_num, replace=True)
-        df_train = df_train.drop(df_test.index)
-        df_valid.to_csv(paths["meta_test_path"], index=False)
-    df_train.to_csv(paths["meta_train_path"], index=False)
+    out_path = os.path.join(get_project_root(), "emoji_embedding", out_path)
+    df.to_csv(out_path, index=False)
 
 
 if __name__ == "__main__":
-    """Constructs metadata from folder structure for emojipedia images.
-    Splits data into embedding training data and zero-shot data.
-    Then splits embedding training data into training and validation data.
-    """
-    zero_shot_emoji_must_have = [
-        "flushed_face",
-        "backhand_index_pointing_right",
-        "raising_hands",
-        "male_sign",
-        "sparkling_heart",
-        "female_sign",
-        "person_shrugging",
-        "smiling_face",
-        "flexed_biceps",
-        "collision",
-    ]
 
-    prepare_meta_data(zero_shot_emoji_must_have)
-    split_data()
+    hemj_df = preprocess_hotemoji_data()
+    df = preprocess_emojipedia_data()
+    merge_emoji_datasets(df, hemj_df, "data/processed/emoji_descriptions.csv")
 
-    train_data = EmojiClassificationDataset("train")
-    valid_data = EmojiClassificationDataset("valid")
+    zero_shot_emojis = get_zeroshot_emojis()
+    key_df = get_keys(zero_shot_emojis, "data/processed/keys.csv")
+
+    prepare_meta_data(key_df, "data/processed/img_meta.csv")
