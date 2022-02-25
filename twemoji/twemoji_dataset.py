@@ -70,7 +70,7 @@ def tocsv(infile, outfile):
     df = preprocess(data)
     print("finished processing")
 
-    df.to_csv(outfile, encoding="utf-8")
+    df.to_csv(outfile, encoding="utf-8", index=False)
     print(f"wrote processed file to {outfile}\n")
 
 
