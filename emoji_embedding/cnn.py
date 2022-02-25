@@ -5,25 +5,6 @@ import torch.nn.functional as F
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class ResnetExtClassifier(nn.Module):
-    def __init__(self, num_classes, emb_dimension):
-        """Uses resnet18 as backbone. Changes the last linear layer and adds one on top. The output dimension should be the number of emoji classes for image
-        classification."""
-        super(ResnetExtClassifier, self).__init__()
-        self.resnet = torch.hub.load(
-            "pytorch/vision:v0.10.0", "resnet18", pretrained=True
-        )
-        self.resnet.fc = nn.Linear(512, emb_dimension)
-        self.prediction_head = nn.Linear(emb_dimension, num_classes)
-
-    def forward(self, x):
-        x = self.resnet(x)
-        x = F.relu(x)
-        x = F.dropout(x, p=0.5)
-        x = self.prediction_head(x)
-        return x
-
-
 class Img2Vec(nn.Module):
     def __init__(self, emb_dimension, pretrained_path=None):
         """Uses resnet18 as backbone. Changes the last linear layer and outputs 300 dim vector for each image."""
