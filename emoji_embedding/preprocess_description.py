@@ -146,19 +146,13 @@ def preprocess_emojipedia_data(save_path=None):
 
 def merge_emoji_datasets(df, hemj_df, save_path):
     mdf = df.merge(hemj_df, how="left", on=["emoji_char", "emoji_char_ascii"])
-
-    mdf["emoji_name_og"] = mdf.emjpd_emoji_name_og.where(
-        mdf.emjpd_emoji_name_og.notna(), mdf.hemj_emoji_name_og
-    ).fillna("")
-
+    mdf = mdf.rename(columns={"emjpd_emoji_name_og": "emoji_name"})
     mdf["emoji_char_ascii_beg"] = mdf.emoji_char_ascii.apply(
         lambda x: "\\" + [y for y in x.split("\\") if len(y) > 0][0]
     )
 
     for col in [
-        "emoji_name_og",
-        "emjpd_emoji_name_og",
-        "hemj_emoji_name_og",
+        "emoji_name",
         "emjpd_full_description",
         "emjpd_description_main",
         "emjpd_description_side",
@@ -173,14 +167,9 @@ def merge_emoji_datasets(df, hemj_df, save_path):
 
     cols = [
         "emoji_char",  # emoji-symbol/picture
-        "emoji_name_og",  # emojipedia emoji name if available, otherwise hotemoji name, otherwise ""
+        "emoji_name",  # emojipedia emoji name
         "emoji_char_ascii",  # emoji expressed in ascii
         "emoji_char_ascii_beg",  # the first emoji part expressed as ascii
-        "emoji_char_bytes",  # emoji expressed as bytes (only for hotemoji)
-        "emjpd_emoji_name",  # emojipedia emoji name (corresponds to folder in scrapped data)
-        "emjpd_emoji_name_og",  # emojipedia emoji name as is in the heading on website
-        "hemj_emoji_name",  # hotemoji emoji name (_ instead of spaces)
-        "hemj_emoji_name_og",  # hotemoji emoji name
         "emjpd_aliases",  # emojipedia aliases for emoji
         "emjpd_shortcodes",  # emojipedia shortcuts for slack/github etc.
         "emjpd_full_description",  # emojipedia all description data scraped unprocessed in utf-8
