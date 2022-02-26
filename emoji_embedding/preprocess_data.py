@@ -372,7 +372,8 @@ def prepare_meta_data(key_df, out_path, seed=1):
         for sub in subdirs:
             for f in os.listdir(os.path.join(path, sub)):
                 if f[-3:] == "jpg":
-                    img_paths.append(os.path.join(path, sub, f))
+                    save_path = os.path.join(path, sub, f)
+                    img_paths.append(save_path.split("emoji_prediction")[1])
                     img_labels.append(sub)
     df = pd.DataFrame({"path": img_paths, "emoji_name": img_labels})
 
