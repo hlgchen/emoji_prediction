@@ -121,34 +121,37 @@ def plot(sample):
 # ************************* pytorch Datasets ********************************
 
 
-class EmojiClassificationDataset(Dataset):
+class EmojiImageDataset(Dataset):
     """
     Creates emoji classififcation Dataset. Each datapoint consists of an emoji image
     tensor (3, img_size, img_size) and a categorical label to it.
 
     Params:
         - dataset_type {str}: string that specifies the dataset type.
-                            Can be ["", "train", "valid", "test"].
+                            Can be ["", "train", "valid", "zero"].
                             If "" the whole dataset is loaded (excluding zeroshot emojis).
         - img_size {int}: height and width of the images in the dataset
     """
 
-    def __init__(self, dataset_type="", img_size=224, label_flag=True):
-        path_suffix = "_" + dataset_type
-        meta_path = f"emoji_embedding/data/meta/img_meta{path_suffix}.csv"
+    def __init__(self, dataset_type="", img_size=224):
+        meta_path = "emoji_embedding/data/processed/img_meta.csv"
         meta_path = os.path.join(get_project_root(), meta_path)
-        self.project_root = get_project_root()
-        self.df = pd.read_csv(meta_path)
+        df = pd.read_csv(meta_path)
+        if dataset_type != "":
+            df = df.loc[df.dataset_type == dataset_type]
+        self.df = df
+
         self.scale = Rescale(img_size)
-        self.label = label_flag
+
+        self.project_root = get_project_root()
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        img_name = self.df.iloc[idx, 0]
-        img_name = os.path.join(self.project_root, img_name)
-        input_image = Image.open(img_name).convert("RGB")
+        img_path = self.df.iloc[idx, 0]
+        img_path = os.path.join(self.project_root, img_path)
+        input_image = Image.open(img_path).convert("RGB")
         preprocess = transforms.Compose(
             [
                 transforms.Resize(224),
@@ -160,12 +163,7 @@ class EmojiClassificationDataset(Dataset):
             ]
         )
         input_tensor = preprocess(input_image)
-        if self.label:
-            label = self.df.iloc[idx, 2]  # corresponds to column class in dataframe
-            label = torch.Tensor([label])
-            return input_tensor, label
-        else:
-            return input_tensor
+        return input_tensor
 
     def __len__(self):
         return len(self.df)
@@ -211,19 +209,18 @@ class EmojiImageDescriptionDataset(Dataset):
         )
         self.project_root = get_project_root()
 
-        path_suffix = "_" + dataset_type
-        meta_path = f"emoji_embedding/data/meta/img_meta{path_suffix}.csv"
+        meta_path = "emoji_embedding/data/processed/img_meta.csv"
         meta_path = os.path.join(get_project_root(), meta_path)
-
-        description_path = os.path.join(
-            get_project_root(), "emoji_embedding/data/processed/emoji_descriptions.csv"
-        )
+        description_path = "emoji_embedding/data/processed/emoji_descriptions.csv"
+        description_path = os.path.join(get_project_root(), description_path)
 
         df_meta = pd.read_csv(meta_path)
+        if dataset_type != "":
+            df_meta = df_meta.loc[df_meta.dataset_type == dataset_type]
         df_description = pd.read_csv(description_path)
-        self.df = df_meta.merge(
-            df_description, left_on="label", right_on="emjpd_emoji_name", how="left"
-        )[["path", "emjpd_description_main", "emjpd_emoji_name_og", "emjpd_aliases"]]
+        self.df = df_meta.merge(df_description, how="left")[
+            ["path", "emjpd_description_main", "emjpd_emoji_name_og", "emjpd_aliases"]
+        ]
         self.scale = Rescale(img_size)
 
         name_embeddings = calculate_word2vec_embeddings(self.df.emjpd_emoji_name_og)
