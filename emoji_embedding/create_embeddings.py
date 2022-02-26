@@ -32,7 +32,7 @@ def get_grouping_matrix(dataset):
     df["group_number"] = same.cumsum() - 1
 
     n_groups = df.emoji_name.nunique()
-    m = torch.zeros(n_groups, len(df))
+    m = torch.zeros(n_groups, len(df)).to(device)
 
     for i, j in zip(df.group_number, df.index):
         m[i][j] = 1
@@ -73,14 +73,17 @@ def create_vision_embedding():
     )
 
     # subset for training
-    train_df = total_image_ds.df.loc[~total_image_ds.df.zero_shot][
-        ["group_number", "emoji_id"]
-    ].drop_duplicates()
+    train_df = (
+        total_image_ds.df.loc[~total_image_ds.df.zero_shot][
+            ["group_number", "emoji_id"]
+        ]
+        .drop_duplicates()
+        .sort_values(by="group_number", ascending=True)
+        .reset_index(drop=True)
+    )
     train_idx = train_df.group_number.tolist()
     train_embeddings = all_embeddings[train_idx]
-    train_embeddings_mapping = {
-        i: e for i, e in zip(train_df.group_number, train_df.emoji_id)
-    }
+    train_embeddings_mapping = {i: e for i, e in zip(train_df.index, train_df.emoji_id)}
     save_data(train_embeddings, train_embeddings_mapping, "train_embeddings")
 
 
