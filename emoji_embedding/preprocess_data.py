@@ -388,6 +388,7 @@ def prepare_meta_data(key_df, out_path, seed=1):
     df = pd.DataFrame({"path": img_paths, "emoji_name": img_labels})
 
     df = df.merge(key_df[["emoji_id", "emoji_name", "zero_shot"]])
+    df = df.sort_values(by="emoji_id")
 
     df["dataset_type"] = "train"
     valid_index = df.groupby("emoji_name").sample(1).index
