@@ -123,8 +123,8 @@ def plot(sample):
 
 class EmojiImageDataset(Dataset):
     """
-    Creates emoji classififcation Dataset. Each datapoint consists of an emoji image
-    tensor (3, img_size, img_size) and a categorical label to it.
+    Creates emoji image Dataset. Each datapoint consists of an emoji image
+    tensor (3, img_size, img_size).
 
     Params:
         - dataset_type {str}: string that specifies the dataset type.
@@ -180,7 +180,7 @@ class EmojiImageDescriptionDataset(Dataset):
 
     Params:
         - dataset_type {str}: string that specifies the dataset type.
-                            Can be ["", "train", "valid", "test"].
+                            Can be ["", "train", "valid", "zero"].
                             If "" the whole dataset is loaded (excluding zeroshot emojis).
         - img_size {int}: height and width of the images in the dataset
         - seed {int}: random seed for random negative sampling when returning datapoints

@@ -17,6 +17,10 @@ def decode(description):
 
 
 def preprocess_hotemoji_data(save_path=None):
+    """
+    Preprocessed scraped hotemoji data and returns it as pd.DataFrame.
+    If a save_path is specified the data is saved.
+    """
     read_path = os.path.join(
         get_project_root(),
         "emoji_embedding",
@@ -99,6 +103,10 @@ def split_description(description):
 
 
 def preprocess_emojipedia_data(save_path=None):
+    """
+    Preprocesses scraped emojipedia data and returns it as a dataframe.
+    If a save_path is specified data is saved there.
+    """
     read_path = os.path.join(
         get_project_root(),
         "emoji_embedding",
@@ -146,6 +154,11 @@ def preprocess_emojipedia_data(save_path=None):
 
 
 def merge_emoji_datasets(df, hemj_df, save_path):
+    """
+    Does a left join on emojipedia and hotemoji data. The emojipedia data is on the left.
+    Essentially only description information from hotemoji is added to the data of emojipedia.
+    Saves the merged dataframe in the specified save_path.
+    """
     mdf = df.merge(hemj_df, how="left", on=["emoji_char", "emoji_char_ascii"])
     mdf = mdf.rename(columns={"emjpd_emoji_name": "emoji_name"})
     mdf["emoji_char_ascii_beg"] = mdf.emoji_char_ascii.apply(
@@ -301,7 +314,24 @@ def get_zeroshot_emojis():
 
 
 def get_keys(zero_shot_emojis, save_path):
-    """ """
+    """
+    Given specified zero_shot_emojis, a dataframe is contained that
+    can serve as the "key" - mapping for other tables.
+
+    Params:
+        - zero_shot_emojis {list}: list of emojis that are specified as
+                                    zero shot emojis. These emojis will not
+                                    be seen by the vision model during training.
+        - save_path {str}: string specifying the location to save the dataframe.
+
+    The dataframe has the following columns:
+        - emoji_id: integer emoji_id
+        - emoji_name: emojisname as in emojipedia but with processing of space etc.
+        - emoji_char_ascii: emoji ascii escape notation
+        - emoji_char_ascii_beg: first emoji escape notation,
+                            (emoji can be composed of many parts)
+        - zero_shot: boolean specifying whether an emoji is part of the zero shot set
+    """
     description_path = "data/processed/emoji_descriptions.csv"
     description_path = os.path.join(
         get_project_root(), "emoji_embedding", description_path
@@ -322,7 +352,15 @@ def get_keys(zero_shot_emojis, save_path):
 
 def prepare_meta_data(key_df, out_path, seed=1):
 
-    """ """
+    """
+    Creates dataframe with paths, emoji_name, zero_shot - flag and dataset_type
+    for each image in the emojipedia dataset.
+    dataset_type can be 'train', 'valid' or 'zero'.
+    'zero' will be all images from the emojis that are part of the zero_shot test.
+    All other emojis will be seen during training of the vision model.
+    The validation and train test split is for the images only. For each emoji,
+    one random image will be put in the validation set.
+    """
 
     np.random.seed(seed)
     img_path = "data/emojipedia/"
