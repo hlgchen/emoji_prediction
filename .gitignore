@@ -12,5 +12,5 @@ emoji_embedding/data/emojipedia.zip
 
 twemoji/raw_data
 twemoji/unfiltered_processed
-twemoji/processed_data
+twemoji/data
 *checkpoint*
