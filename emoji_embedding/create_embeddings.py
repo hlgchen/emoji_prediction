@@ -6,7 +6,6 @@ import ast
 import pandas as pd
 import numpy as np
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from transformers import DistilBertTokenizer, DistilBertModel
 import gensim.downloader as api
@@ -175,7 +174,7 @@ def get_vector_wrapper(emb, emb_vocabulary, default):
     return get_vector
 
 
-def get__word_vector_embedding(weighting, df, get_vector):
+def get_word_vector_embedding(weighting, df, get_vector):
     """Returns average word embedding for emojis given weighting rule. For
     each column specified in weighting the average embedding will be calculated.
     The embeddings of the columns are averaged with the specified weights
@@ -226,7 +225,7 @@ def create_word_vector_embeddings():
         "hemj_emoji_description": 15,
     }
 
-    all_embeddings = get__word_vector_embedding(weighting, df, get_vector)
+    all_embeddings = get_word_vector_embedding(weighting, df, get_vector)
     train_embeddings = all_embeddings.loc[~df.zero_shot]
 
     all_embeddings = torch.stack([torch.from_numpy(x) for x in all_embeddings])
