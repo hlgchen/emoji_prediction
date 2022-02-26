@@ -166,8 +166,10 @@ def merge_emoji_datasets(df, hemj_df, save_path):
     mdf["emjpd_aliases"] = mdf["emjpd_aliases"].apply(
         lambda x: [s.lower() for s in x] if isinstance(x, list) else []
     )
+    mdf["emoji_id"] = mdf.index
 
     cols = [
+        "emoji_id",  # just the index of the emoji
         "emoji_char",  # emoji-symbol/picture
         "emoji_name",  # emojipedia emoji name processed
         "emoji_char_ascii",  # emoji expressed in ascii
@@ -305,7 +307,7 @@ def get_keys(zero_shot_emojis, save_path):
         get_project_root(), "emoji_embedding", description_path
     )
     df = pd.read_csv(description_path)[
-        ["emoji_name", "emoji_char_ascii", "emoji_char_ascii_beg"]
+        ["emoji_id", "emoji_name", "emoji_char_ascii", "emoji_char_ascii_beg"]
     ]
     df["zero_shot"] = df.emoji_name.apply(lambda x: x in zero_shot_emojis)
 
@@ -336,7 +338,7 @@ def prepare_meta_data(key_df, out_path, seed=1):
                     img_labels.append(sub)
     df = pd.DataFrame({"path": img_paths, "emoji_name": img_labels})
 
-    df = df.merge(key_df[["emoji_name", "zero_shot"]])
+    df = df.merge(key_df[["emoji_id", "emoji_name", "zero_shot"]])
 
     df["dataset_type"] = "train"
     valid_index = df.groupby("emoji_name").sample(1).index
