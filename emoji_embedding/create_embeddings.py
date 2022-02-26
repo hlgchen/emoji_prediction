@@ -1,21 +1,23 @@
 import os
 from tqdm import tqdm
-import json
+import re
+import ast
 
-import torch
-from torch.utils.data import DataLoader
-
-from cnn import Img2Vec
-from emoji_image_dataset import EmojiImageDataset
-
-import gensim.downloader as api
 import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
+from transformers import DistilBertTokenizer, DistilBertModel
+import gensim.downloader as api
 
-import re
-import ast
+from cnn import Img2Vec
+from emoji_image_dataset import EmojiImageDataset
+
+from time import time
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def get_project_root():
@@ -25,10 +27,23 @@ def get_project_root():
 
 def save_data(embeddings, dataset_name):
     path = os.path.join(get_project_root(), "emoji_embedding/data/processed")
+    if not os.path.exists(path):
+        os.makedirs(path)
     torch.save(embeddings, os.path.join(path, f"{dataset_name}.pt"))
 
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def load_and_process_description():
+    """Loads desciption emoji and processes emjpd_aliases column by concatenating the
+    aliases to a string separated by whitespace"""
+    path = "emoji_embedding/data/processed/emoji_descriptions.csv"
+    path = os.path.join(get_project_root(), path)
+    df = pd.read_csv(path)
+    df.emjpd_aliases = df.emjpd_aliases.apply(
+        lambda x: ast.literal_eval(x) if isinstance(x, str) else []
+    )
+    df.emjpd_aliases = df.emjpd_aliases.apply(lambda x: " ".join(x))
+    return df
+
 
 # ************************ create vision embedding ***********************
 
@@ -129,19 +144,6 @@ def load_embedding_model(model):
     return wv_from_bin
 
 
-def load_and_process_description():
-    """Loads desciption emoji and processes emjpd_aliases column by concatenating the
-    aliases to a string separated by whitespace"""
-    path = "emoji_embedding/data/processed/emoji_descriptions.csv"
-    path = os.path.join(get_project_root(), path)
-    df = pd.read_csv(path)
-    df.emjpd_aliases = df.emjpd_aliases.apply(
-        lambda x: ast.literal_eval(x) if isinstance(x, str) else []
-    )
-    df.emjpd_aliases = df.emjpd_aliases.apply(lambda x: " ".join(x))
-    return df
-
-
 def get_vector_wrapper(emb, emb_vocabulary, default):
     """returns get vector function with given variables"""
 
@@ -171,7 +173,7 @@ def get_vector_wrapper(emb, emb_vocabulary, default):
     return get_vector
 
 
-def get_embedding(weighting, df, get_vector):
+def get__word_vector_embedding(weighting, df, get_vector):
     """Returns average word embedding for emojis given weighting rule. For
     each column specified in weighting the average embedding will be calculated.
     The embeddings of the columns are averaged with the specified weights
@@ -222,7 +224,7 @@ def create_word_vector_embeddings():
         "hemj_emoji_description": 15,
     }
 
-    all_embeddings = get_embedding(weighting, df, get_vector)
+    all_embeddings = get__word_vector_embedding(weighting, df, get_vector)
     train_embeddings = all_embeddings.loc[~df.zero_shot]
 
     all_embeddings = torch.stack([torch.from_numpy(x) for x in all_embeddings])
@@ -234,6 +236,85 @@ def create_word_vector_embeddings():
 # ************************ create description embedding via BERT***********************
 
 
+def get_model_embedding_wrapper(tokenizer, model):
+    """return get_model_embedding with predefined values for variables"""
+
+    def get_model_embedding(text_ls, mode="avg"):
+        """returns embedding of texts specified in text_ls dependent on mode
+        If mode is 'avg' last hidden states for all non padding tokens are averaged.
+        If mode is 'last' only the hidden state for the last non padding token is taken.
+        """
+        encoded_input = tokenizer(
+            text_ls, return_tensors="pt", truncation=True, padding=True
+        )
+        with torch.no_grad():
+            input_ids = encoded_input["input_ids"].to(device)
+            attention_mask = encoded_input["attention_mask"].to(device)
+            output = model(
+                input_ids=input_ids, attention_mask=attention_mask
+            ).last_hidden_state
+
+        result_ls = []
+        if mode == "avg":
+            for i, l in enumerate(encoded_input.attention_mask.sum(dim=1).tolist()):
+                result_ls.append(output[i, :l].mean(dim=0))
+        elif mode == "last":
+            for i, l in enumerate(encoded_input.attention_mask.sum(dim=1).tolist()):
+                result_ls.append(output[i, l - 1])
+        else:
+            print("mode is not valid")
+        return result_ls
+
+    return get_model_embedding
+
+
+def get_bert_embeddings(df, get_model_embedding, batch_size=128):
+
+    filler = "\u25A1" * 3
+    s = df.emoji_name_og.fillna("") + filler
+    s += df.emjpd_aliases.fillna("") + filler
+    s += df.emjpd_description_main.fillna("").str.replace("\n", filler) + filler
+    s_ls = s.tolist()
+
+    embedding_ls = []
+
+    for i in range(batch_size, len(s_ls), batch_size):
+        start = time.time()
+        embedding_ls += get_model_embedding(s_ls[i - batch_size : i])
+        print(f"processed {i- batch_size} to {i}, took {time.time() - start}")
+
+    # embedding_dict = {
+    #     k: v for k, v in zip(df.emoji_char.tolist()[: len(embedding_ls)], embedding_ls)
+    # }
+    embeddings = torch.stack(embedding_ls)
+    return embeddings
+
+
+def create_distil_bert_embeddings():
+
+    df = load_and_process_description()
+
+    base_model_name = (
+        "distilbert-base-uncased"  # the tokenizer does not know the emojis
+    )
+    tokenizer = DistilBertTokenizer.from_pretrained(base_model_name)
+    model = DistilBertModel.from_pretrained(base_model_name)
+    model.eval()
+    model.to(device)
+
+    get_model_embedding = get_model_embedding_wrapper(tokenizer, model)
+    all_embeddings = get_bert_embeddings(df, get_model_embedding, 128)
+    train_embeddings = all_embeddings.loc[~df.zero_shot]
+
+    all_embeddings = torch.stack([torch.from_numpy(x) for x in all_embeddings])
+    train_embeddings = torch.stack([torch.from_numpy(x) for x in train_embeddings])
+    save_data(all_embeddings, "bert_embeddings/all_embeddings")
+    save_data(train_embeddings, "bert_embeddings/train_embeddings")
+
+
+# ******************** combine embeddings ******************************
+
 if __name__ == "__main__":
     create_vision_embedding()
     create_word_vector_embeddings()
+    create_distil_bert_embeddings()
