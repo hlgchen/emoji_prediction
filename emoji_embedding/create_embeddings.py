@@ -16,6 +16,8 @@ def get_project_root():
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# ************************ create vision embedding ***********************
+
 
 def load_emimem(path="model/emoji_image_embedding/emimem.ckpt"):
     path = os.path.join(get_project_root(), "emoji_embedding", path)
@@ -42,7 +44,9 @@ def get_grouping_matrix(dataset):
 
 
 def save_data(embeddings, mapping, dataset_name):
-    path = os.path.join(get_project_root(), "emoji_embedding/data/processed")
+    path = os.path.join(
+        get_project_root(), "emoji_embedding/data/processed/image_embeddings"
+    )
     torch.save(embeddings, os.path.join(path, f"{dataset_name}.pt"))
     with open(os.path.join(path, f"{dataset_name}_mapping.json"), "w") as f:
         json.dump(mapping, f, indent=4)
@@ -85,6 +89,9 @@ def create_vision_embedding():
     train_embeddings = all_embeddings[train_idx]
     train_embeddings_mapping = {i: e for i, e in zip(train_df.index, train_df.emoji_id)}
     save_data(train_embeddings, train_embeddings_mapping, "train_embeddings")
+
+
+# ************************ create description embedding via word vectors***********************
 
 
 if __name__ == "__main__":
