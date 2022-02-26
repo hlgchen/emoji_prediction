@@ -27,9 +27,11 @@ def get_project_root():
 
 def save_data(embeddings, dataset_name):
     path = os.path.join(get_project_root(), "emoji_embedding/data/processed")
-    if not os.path.exists(path):
-        os.makedirs(path)
-    torch.save(embeddings, os.path.join(path, f"{dataset_name}.pt"))
+    path = os.path.join(path, f"{dataset_name}.pt")
+    folder = os.path.dirname(path)
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    torch.save(embeddings, path)
 
 
 def load_and_process_description():
@@ -271,7 +273,7 @@ def get_model_embedding_wrapper(tokenizer, model):
 def get_bert_embeddings(df, get_model_embedding, batch_size=128):
 
     filler = "\u25A1" * 3
-    s = df.emoji_name_og.fillna("") + filler
+    s = df.emjpd_emoji_name_og.fillna("") + filler
     s += df.emjpd_aliases.fillna("") + filler
     s += df.emjpd_description_main.fillna("").str.replace("\n", filler) + filler
     s_ls = s.tolist()
@@ -279,9 +281,12 @@ def get_bert_embeddings(df, get_model_embedding, batch_size=128):
     embedding_ls = []
 
     for i in range(batch_size, len(s_ls), batch_size):
-        start = time.time()
+        start = time()
         embedding_ls += get_model_embedding(s_ls[i - batch_size : i])
-        print(f"processed {i- batch_size} to {i}, took {time.time() - start}")
+        print(f"processed {i- batch_size} to {i}, took {time() - start}")
+    start = time()
+    embedding_ls += get_model_embedding(s_ls[i:])
+    print(f"processed {i} to {len(s_ls)}, took {time() - start}")
 
     # embedding_dict = {
     #     k: v for k, v in zip(df.emoji_char.tolist()[: len(embedding_ls)], embedding_ls)
@@ -304,15 +309,23 @@ def create_distil_bert_embeddings():
 
     get_model_embedding = get_model_embedding_wrapper(tokenizer, model)
     all_embeddings = get_bert_embeddings(df, get_model_embedding, 128)
-    train_embeddings = all_embeddings.loc[~df.zero_shot]
+    train_embeddings = all_embeddings[(~df.zero_shot).tolist()]
 
-    all_embeddings = torch.stack([torch.from_numpy(x) for x in all_embeddings])
-    train_embeddings = torch.stack([torch.from_numpy(x) for x in train_embeddings])
     save_data(all_embeddings, "bert_embeddings/all_embeddings")
     save_data(train_embeddings, "bert_embeddings/train_embeddings")
 
 
 # ******************** combine embeddings ******************************
+
+
+def get_emoji_fixed_embedding(emb_paths):
+    emb_ls = []
+    for emb_path in emb_paths:
+        emb = torch.load(emb_path, map_location=device)
+        emb_ls.append(emb)
+    embedding = torch.cat(emb_ls, dim=-1)
+    return embedding
+
 
 if __name__ == "__main__":
     create_vision_embedding()
