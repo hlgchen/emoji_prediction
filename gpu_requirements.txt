@@ -8,3 +8,4 @@ torchvision
 tqdm
 sentence-transformers
 transformers
+gensim==4.1.2
