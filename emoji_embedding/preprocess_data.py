@@ -153,10 +153,19 @@ def preprocess_emojipedia_data(save_path=None):
 # ************************ merge datasets ********************************
 
 
-def merge_emoji_datasets(df, hemj_df, save_path):
+def merge_emoji_datasets(df, hemj_df, zero_shot_emojis, save_path):
     """
     Does a left join on emojipedia and hotemoji data. The emojipedia data is on the left.
     Essentially only description information from hotemoji is added to the data of emojipedia.
+
+    Adds information on whether an emoji is part of the zero shot set.
+    All emojis specified in zero_shot_emojis will be part of the zero shot set.
+    This means that these emojis will not be seen during the training of the
+    image embedder.
+
+    Sorts the dataframe according to zero shot statues (first non-zero-shot emojis)
+    then accoring to emoji_name.
+
     Saves the merged dataframe in the specified save_path.
     """
     mdf = df.merge(hemj_df, how="left", on=["emoji_char", "emoji_char_ascii"])
@@ -179,10 +188,13 @@ def merge_emoji_datasets(df, hemj_df, save_path):
     mdf["emjpd_aliases"] = mdf["emjpd_aliases"].apply(
         lambda x: [s.lower() for s in x] if isinstance(x, list) else []
     )
+    mdf["zero_shot"] = mdf.emoji_name.apply(lambda x: x in zero_shot_emojis)
+    mdf = mdf.sort_values(by=["zero_shot", "emoji_name"]).reset_index(drop=True)
     mdf["emoji_id"] = mdf.index
 
     cols = [
         "emoji_id",  # just the index of the emoji
+        "zero_shot",  # indicates whether the emoji is part of the zero shot set
         "emoji_char",  # emoji-symbol/picture
         "emoji_name",  # emojipedia emoji name processed
         "emoji_char_ascii",  # emoji expressed in ascii
@@ -313,16 +325,9 @@ def get_zeroshot_emojis():
     return ls
 
 
-def get_keys(zero_shot_emojis, save_path):
+def get_keys(save_path):
     """
-    Given specified zero_shot_emojis, a dataframe is contained that
-    can serve as the "key" - mapping for other tables.
-
-    Params:
-        - zero_shot_emojis {list}: list of emojis that are specified as
-                                    zero shot emojis. These emojis will not
-                                    be seen by the vision model during training.
-        - save_path {str}: string specifying the location to save the dataframe.
+    This dataframe will serve as a key table for matching.
 
     The dataframe has the following columns:
         - emoji_id: integer emoji_id
@@ -337,9 +342,14 @@ def get_keys(zero_shot_emojis, save_path):
         get_project_root(), "emoji_embedding", description_path
     )
     df = pd.read_csv(description_path)[
-        ["emoji_id", "emoji_name", "emoji_char_ascii", "emoji_char_ascii_beg"]
+        [
+            "emoji_id",
+            "emoji_name",
+            "emoji_char_ascii",
+            "emoji_char_ascii_beg",
+            "zero_shot",
+        ]
     ]
-    df["zero_shot"] = df.emoji_name.apply(lambda x: x in zero_shot_emojis)
 
     save_path = os.path.join(get_project_root(), "emoji_embedding", save_path)
     df.to_csv(save_path, index=False)
@@ -392,9 +402,11 @@ if __name__ == "__main__":
 
     hemj_df = preprocess_hotemoji_data()
     df = preprocess_emojipedia_data()
-    merge_emoji_datasets(df, hemj_df, "data/processed/emoji_descriptions.csv")
-
     zero_shot_emojis = get_zeroshot_emojis()
-    key_df = get_keys(zero_shot_emojis, "data/processed/keys.csv")
+
+    merge_emoji_datasets(
+        df, hemj_df, zero_shot_emojis, "data/processed/emoji_descriptions.csv"
+    )
+    key_df = get_keys("data/processed/keys.csv")
 
     prepare_meta_data(key_df, "data/processed/img_meta.csv")
