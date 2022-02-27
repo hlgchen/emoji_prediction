@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from time import time
+import re
 
 from emoji import UNICODE_EMOJI
 
@@ -84,14 +85,15 @@ def preprocess(data):
         {"id": ids, "raw_text": raw_texts, "emojis": emojis, "emoji_ids": emoji_ids}
     )
     df["text_no_emojis"] = df.apply(
-        lambda x: x.raw_text.replace("|".join(x.emojis.split()), ""), axis=1
+        lambda x: re.sub("|".join(list(x.emojis)), "", x.raw_text), axis=1
     )
     # df["text_replaced_emojis"] = df.apply(
-    #     lambda x: x.raw_text.replace("|".join(x.emojis.split()), " xxxxxxxx "), axis=1
+    #     lambda x: re.sub("|".join(list(x.emojis)), " xxxxxxxx ", x.raw_text)), axis=1
     # )
 
     df.emojis = df.emojis.where(df.emojis != "")
     df.emoji_ids = df.emoji_ids.where(df.emoji_ids.apply(len) > 0)
+    df.text_no_emojis = df.text_no_emojis.where(df.text_no_emojis != "")
     return df
 
 
