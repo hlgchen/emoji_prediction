@@ -76,7 +76,7 @@ def preprocess(data):
     split_data = [s.split(" ", maxsplit=1) for s in data]
     split_data = [list(i) for i in zip(*split_data)]
     ids = split_data[0]
-    raw_texts = [s.strip() for s in split_data[1]]
+    raw_texts = [s.strip().lower() for s in split_data[1]]
     emojis_emoji_ids = [extract_emojis(s) for s in raw_texts]
     emojis = [e[0] for e in emojis_emoji_ids]
     emoji_ids = [e[1] for e in emojis_emoji_ids]
