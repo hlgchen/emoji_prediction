@@ -147,5 +147,5 @@ if __name__ == "__main__":
         criterion,
         optimizer,
         num_epochs=1000,
-        name="simpel_embert",
+        name="simple_embert",
     )
