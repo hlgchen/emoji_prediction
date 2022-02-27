@@ -12,6 +12,7 @@ class TwemojiData:
     def __init__(
         self, data, nrows=None, shuffle=False, batch_size=64, limit=None, seed=1
     ):
+        print(f"random seed is: {seed}")
         np.random.seed(seed)
         if isinstance(data, str):
             twemoji_path = os.path.join(
@@ -60,6 +61,7 @@ class TwemojiDataChunks:
     def __init__(
         self, dataset_type, chunksize=64000, shuffle=False, batch_size=64, seed=1
     ):
+        print(f"random seed is: {seed}")
         np.random.seed(seed)
         twemoji_path = os.path.join(
             get_project_root(), f"twemoji/data/twemoji_{dataset_type}.csv"

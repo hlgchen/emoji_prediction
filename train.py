@@ -1,14 +1,15 @@
 import os
 from time import time
+import numpy as np
 import torch
 import torch.nn as nn
-import copy
 from tqdm import tqdm
 
 from pprint import pprint
 from emoji_embedding.utils import model_summary
 from embert import EmbertLoss, SimpleEmbert, Accuracy
 from twemoji.twemoji_dataset import TwemojiData, TwemojiDataChunks
+import re
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,6 +30,7 @@ def train_model(
     optimizer,
     num_epochs,
     name,
+    start_chunk,
     base=None,
 ):
     """
@@ -49,7 +51,7 @@ def train_model(
         print(f"Epoch {epoch}")
         print("-" * 10)
 
-        for chunk_i, dataloaders in enumerate(dataloader_ls):
+        for dataloaders in dataloader_ls:
             start_time_chunk = time()
             for phase in ["train", "valid"]:
                 if phase == "train":
@@ -99,7 +101,7 @@ def train_model(
             time_elapsed = time() - start_time_chunk
             print(
                 "Chunk {}/{} FINISHED, took {:.0f}m {:.0f}s".format(
-                    chunk_i,
+                    start_chunk,
                     len(dataloader_ls),
                     time_elapsed // 60,
                     time_elapsed % 60,
@@ -114,26 +116,33 @@ def train_model(
                 model.state_dict(),
                 os.path.join(
                     base,
-                    f"{name}_chunk{chunk_i+1}.ckpt",
+                    f"{name}_chunk{start_chunk+1}.ckpt",
                 ),
             )
             print("model saved")
+            start_chunk += 1
 
 
 if __name__ == "__main__":
 
+    # pretrained_path = "/content/drive/MyDrive/cs224n_project/trained_models/run1/simple_embert_chunk2.ckpt"
     pretrained_path = None
     model = SimpleEmbert()
     model.train()
     model = model.to(device)
+    start_chunk = 0
     if pretrained_path is not None:
         model.load_state_dict(torch.load(pretrained_path, map_location=device))
+        start_chunk = int(re.findall(r"\d+", pretrained_path.split("/")[-1])[0])
     # pprint(model_summary(model))
 
+    seed = np.random.randint(100000)
     train_data_chunks = TwemojiDataChunks(
-        "train", chunksize=64000, shuffle=True, batch_size=64
+        "train", chunksize=64000, shuffle=True, batch_size=64, seed=seed
     )
-    valid_data = TwemojiData("valid", shuffle=True, batch_size=64, limit=6400)
+    valid_data = TwemojiData(
+        "valid", shuffle=True, batch_size=64, limit=6400, seed=seed
+    )
     dataloader_ls = [
         {"train": train_data, "valid": valid_data} for train_data in train_data_chunks
     ]
@@ -148,4 +157,6 @@ if __name__ == "__main__":
         optimizer,
         num_epochs=1000,
         name="simple_embert",
+        start_chunk=start_chunk,
+        # base = "/content/drive/MyDrive/cs224n_project/trained_models/run1"
     )
