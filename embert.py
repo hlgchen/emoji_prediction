@@ -82,7 +82,7 @@ class SimpleEmbert(nn.Module):
 
         X_1 = self.linear1(X_1)
         X_2 = self.linear2(X_2)
-        # out = F.sigmoid((X_1 * X_2).sum(dim=1)).view(-1, len(emoji_ids))
+
         out = (X_1 * X_2).sum(dim=1).view(-1, len(emoji_ids))
         out = F.softmax(out, dim=1)
 
@@ -184,9 +184,6 @@ class EmbertLoss(nn.Module):
             mask[labels[i]] = True
             correct_average_p = torch.sum(torch.log(probas[i][mask]))
             wrong_average_p = torch.sum(torch.log(1 - probas[i][~mask]))
-            # correct_average_p = torch.mean(probas[i][mask])
-            # wrong_average_p = torch.mean(probas[i][~mask])
-            # wrong_average_p = torch.topk(probas[i][~mask], 10)[0].mean()
             loss += (1 / len(labels)) * -(wrong_average_p + correct_average_p)
             # print(
             #     f"correct_average_p: {correct_average_p:.4f} wrong_average_p: {wrong_average_p:.4f} loss: {loss:.4f} \n"
