@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from transformers import DistilBertTokenizer, DistilBertModel, BertConfig
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -51,13 +52,8 @@ class SimpleEmbert(nn.Module):
             base_model_name
         ).hidden_size
 
-        self.prediction_head = nn.Sequential(
-            nn.Linear(self.emoji_embedding_size + self.sentence_embedding_size, 1),
-            # nn.ReLU(),
-            # nn.Linear(32, 1),
-            nn.Sigmoid(),
-        )
-        self.prediction_head.requires_grad_ = False
+        self.linear1 = nn.Linear(self.sentence_embedding_size, 200)
+        self.linear2 = nn.Linear(self.emoji_embedding_size, 200)
 
     def forward(self, sentence_ls, emoji_ids):
         encoded_input = self.tokenizer(
@@ -84,12 +80,9 @@ class SimpleEmbert(nn.Module):
         X_1 = sentences_embeddings.repeat_interleave(len(emoji_ids), dim=0)
         X_2 = emoji_embeddings.repeat(len(sentence_ls), 1)
 
-        X = torch.cat([X_1, X_2], dim=1)
-        out = self.prediction_head(X)
-        out = out.view(-1, len(emoji_ids))
-
-        # max_probas, max_emojis = out.max(dim=1)
-        # return max_probas, max_emojis
+        X_1 = self.linear1(X_1)
+        X_2 = self.linear2(X_2)
+        out = F.sigmoid((X_1 * X_2).sum(dim=1)).view(-1, len(emoji_ids))
 
         return out
 
@@ -132,10 +125,8 @@ class Embert(nn.Module):
             self.emoji_embeddings.size(1) + self.sentence_embedding_size
         )
 
-        self.prediction_head = nn.Sequential(
-            nn.Linear(self.emoji_embedding_size + self.sentence_embedding_size, 1),
-            nn.Sigmoid(),
-        )
+        self.linear1 = nn.Linear(self.sentence_embedding_size, 200)
+        self.linear2 = nn.Linear(self.emoji_embedding_size, 200)
 
     def partial_forward(self, sentence_ls, model):
         encoded_input = self.tokenizer(
@@ -173,12 +164,9 @@ class Embert(nn.Module):
         X_1 = sentences_embeddings.repeat_interleave(len(emoji_ids), dim=0)
         X_2 = emoji_embeddings.repeat(len(sentence_ls), 1)
 
-        X = torch.cat([X_1, X_2], dim=1)
-        out = self.prediction_head(X)
-        out = out.view(-1, len(emoji_ids))
-
-        # max_probas, max_emojis = out.max(dim=1)
-        # return max_probas, max_emojis
+        X_1 = self.linear1(X_1)
+        X_2 = self.linear2(X_2)
+        out = F.sigmoid((X_1 * X_2).sum(dim=1)).view(-1, len(emoji_ids))
 
         return out
 
@@ -212,9 +200,9 @@ class Accuracy(nn.Module):
             y = set(labels[i])
             predicted_emojis = torch.topk(probas[i], len(y))[1]
             predicted_emojis = set(predicted_emojis.tolist())
-            print(
-                f"predicted emojis: {torch.topk(probas[i], 5)[1]} actual: {y} predicted probas {torch.topk(probas[i], 5)[0]} \n"
-            )
+            # print(
+            #     f"predicted emojis: {torch.topk(probas[i], 5)[1]} actual: {y} predicted probas {torch.topk(probas[i], 5)[0]} \n"
+            # )
             accuracy += (1 / len(labels)) * (
                 len(predicted_emojis.intersection(y)) / len(y)
             )

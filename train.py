@@ -150,22 +150,20 @@ if __name__ == "__main__":
     if pretrained_path is not None:
         model.load_state_dict(torch.load(pretrained_path, map_location=device))
     # pprint(model_summary(model))
-    for name, param in model.named_parameters():
-        print(name, param.requires_grad)
 
-    train_data = TwemojiData("train", shuffle=True, nrows=10)
-    valid_data = TwemojiData("valid", shuffle=True, nrows=5)
+    train_data = TwemojiData("train", shuffle=True)
+    valid_data = TwemojiData("valid", shuffle=True)
     dataloaders = {"train": train_data, "valid": valid_data}
 
     criterion = EmbertLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=5e-6)
+    optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
 
     train_model(
         model,
         dataloaders,
         criterion,
         optimizer,
-        num_epochs=500,
+        num_epochs=1000,
         name="simpel_embert",
-        save_every=500,
+        save_every=2,
     )
