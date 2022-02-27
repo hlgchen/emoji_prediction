@@ -52,8 +52,8 @@ class SimpleEmbert(nn.Module):
             base_model_name
         ).hidden_size
 
-        self.linear1 = nn.Linear(self.sentence_embedding_size, 200)
-        self.linear2 = nn.Linear(self.emoji_embedding_size, 200)
+        self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
+        self.linear2 = nn.Linear(self.emoji_embedding_size, 500)
 
     def forward(self, sentence_ls, emoji_ids):
         encoded_input = self.tokenizer(
