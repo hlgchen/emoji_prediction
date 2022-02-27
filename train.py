@@ -129,9 +129,9 @@ if __name__ == "__main__":
     # pprint(model_summary(model))
 
     train_data_chunks = TwemojiDataChunks(
-        "train", chunksize=128, shuffle=True, batch_size=64
+        "train", chunksize=64000, shuffle=True, batch_size=64
     )
-    valid_data = TwemojiData("valid", shuffle=True, batch_size=64, limit=128)
+    valid_data = TwemojiData("valid", shuffle=True, batch_size=64, limit=6400)
     dataloader_ls = [
         {"train": train_data, "valid": valid_data} for train_data in train_data_chunks
     ]
