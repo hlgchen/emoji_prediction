@@ -9,3 +9,5 @@ tqdm
 sentence-transformers
 transformers
 gensim==4.1.2
+transformers==4.16.2
+emoji
