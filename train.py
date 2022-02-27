@@ -29,6 +29,7 @@ def train_model(
     optimizer,
     num_epochs,
     name,
+    base=None,
 ):
     """
     Trains model with specified setup. Models are saved after every chunk.
@@ -105,7 +106,8 @@ def train_model(
                 )
             )
             print("-" * 10)
-            base = os.path.join(get_project_root(), f"trained_models/run1/")
+            if base is None:
+                base = os.path.join(get_project_root(), f"trained_models/run1/")
             if not os.path.exists(base):
                 os.makedirs(base)
             torch.save(
