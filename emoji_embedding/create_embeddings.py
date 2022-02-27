@@ -73,6 +73,7 @@ def get_grouping_matrix(dataset):
 
     for i, j in zip(df.group_number, df.index):
         m[i][j] = 1
+    m = torch.divide(m, m.sum(dim=1).unsqueeze(1))
     return m
 
 
@@ -312,18 +313,6 @@ def create_distil_bert_embeddings():
 
     save_data(all_embeddings, "bert_embeddings/all_embeddings")
     save_data(train_embeddings, "bert_embeddings/train_embeddings")
-
-
-# ******************** combine embeddings ******************************
-
-
-def get_emoji_fixed_embedding(emb_paths):
-    emb_ls = []
-    for emb_path in emb_paths:
-        emb = torch.load(emb_path, map_location=device)
-        emb_ls.append(emb)
-    embedding = torch.cat(emb_ls, dim=-1)
-    return embedding
 
 
 if __name__ == "__main__":
