@@ -12,7 +12,6 @@ class TwemojiData:
     def __init__(
         self, data, nrows=None, shuffle=False, batch_size=64, limit=None, seed=1
     ):
-        print(f"random seed is: {seed}")
         np.random.seed(seed)
         if isinstance(data, str):
             twemoji_path = os.path.join(
