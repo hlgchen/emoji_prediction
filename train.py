@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from pprint import pprint
 from emoji_embedding.utils import model_summary
-from embert import EmbertLoss, SimpleEmbert, Accuracy
+from embert import EmbertLoss, Accuracy, SimpleEmbert, Embert
 from twemoji.twemoji_dataset import TwemojiData, TwemojiDataChunks
 import re
 
@@ -28,6 +28,7 @@ def train_model(
     dataloader_ls,
     criterion,
     optimizer,
+    scheduler,
     num_epochs,
     name,
     start_chunk,
@@ -121,6 +122,7 @@ def train_model(
             )
             print("model saved")
             start_chunk += 1
+            scheduler.step()
 
 
 if __name__ == "__main__":
@@ -135,7 +137,7 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(pretrained_path, map_location=device))
         start_chunk = int(re.findall(r"\d+", pretrained_path.split("/")[-1])[0])
         print(f"loaded pretrained params from: {pretrained_path}")
-    # pprint(model_summary(model))
+    pprint(model_summary(model))
 
     seed = np.random.randint(100000)
     train_data_chunks = TwemojiDataChunks(
@@ -150,12 +152,14 @@ if __name__ == "__main__":
 
     criterion = EmbertLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
 
     train_model(
         model,
         dataloader_ls,
         criterion,
         optimizer,
+        scheduler=scheduler,
         num_epochs=1000,
         name="simple_embert",
         start_chunk=start_chunk,
