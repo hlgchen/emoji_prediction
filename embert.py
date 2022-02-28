@@ -92,7 +92,7 @@ class SimpleEmbert(nn.Module):
 def get_emoji_descriptions():
 
     description_path = os.path.join(
-        get_project_root(), "emoji_embedding/data/processed/emoji_description.csv"
+        get_project_root(), "emoji_embedding/data/processed/emoji_descriptions.csv"
     )
     df = pd.read_csv(description_path)
 
@@ -168,7 +168,8 @@ class Embert(nn.Module):
 
         X_1 = self.linear1(X_1)
         X_2 = self.linear2(X_2)
-        out = F.sigmoid((X_1 * X_2).sum(dim=1)).view(-1, len(emoji_ids))
+        out = (X_1 * X_2).sum(dim=1).view(-1, len(emoji_ids))
+        out = F.softmax(out, dim=1)
 
         return out
 
