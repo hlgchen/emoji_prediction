@@ -55,6 +55,9 @@ class TwemojiData:
     def __getitem__(self, idx):
         return self.df.text_no_emojis.tolist()[idx], self.df.emoji_ids.tolist()[idx]
 
+    def __len__(self):
+        return len(self.df)
+
 
 class TwemojiDataChunks:
     def __init__(
