@@ -6,7 +6,7 @@ import copy
 from torch.utils.data import DataLoader
 
 from emoji_image_dataset import EmojiImageDescriptionDataset
-from cnn import Img2Vec, ContrastiveLoss
+from ee_model import Img2Vec, ContrastiveLoss
 import utils
 import os
 from tqdm import tqdm

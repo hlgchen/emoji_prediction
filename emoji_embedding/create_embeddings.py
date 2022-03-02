@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from transformers import DistilBertTokenizer, DistilBertModel
 import gensim.downloader as api
 
-from cnn import Img2Vec
+from ee_model import Img2Vec
 from emoji_image_dataset import EmojiImageDataset
 
 from time import time
