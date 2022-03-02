@@ -91,7 +91,7 @@ class SimpleEmbert(nn.Module):
 
 
 class SimpleSembert(nn.Module):
-    def __init__(self, mode="avg"):
+    def __init__(self):
         super(SimpleSembert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=True, bert=True, wordvector=False),

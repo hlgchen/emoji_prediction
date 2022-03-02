@@ -137,13 +137,13 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(pretrained_path, map_location=device))
         start_chunk = int(re.findall(r"\d+", pretrained_path.split("/")[-1])[0])
         print(f"loaded pretrained params from: {pretrained_path}")
-    # pprint(model_summary(model))
+
     print(model_summary(model, verbose=False, only_trainable=False))
     print(model_summary(model, verbose=False, only_trainable=True))
 
     seed = np.random.randint(100000)
     train_data_chunks = TwemojiDataChunks(
-        "train", chunksize=64000, shuffle=True, batch_size=16, seed=seed
+        "train", chunksize=64000, shuffle=True, batch_size=64, seed=seed
     )
     valid_data = TwemojiData(
         "valid", shuffle=True, batch_size=64, limit=6400, seed=seed
@@ -155,10 +155,8 @@ if __name__ == "__main__":
     # dataloader_ls = [{"train": valid_data, "valid": valid_data} for _ in range(200)]
 
     criterion = EmbertLoss()
-    # optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
-    # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
 
     train_model(
         model,
