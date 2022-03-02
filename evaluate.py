@@ -1,4 +1,5 @@
 import os
+from pprint import pprint
 import numpy as np
 import torch
 import pandas as pd
@@ -18,7 +19,8 @@ def get_project_root():
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def print_outputs(model, data):
+def print_outputs(model, data, seed=5):
+    seed = np.random.seed(seed)
     i = np.random.randint(0, len(data) - 32)
 
     X = data[i : i + 32][0]
@@ -53,10 +55,15 @@ if __name__ == "__main__":
         print(f"loaded pretrained params from: {pretrained_path}")
     model.eval()
 
+    pprint(model)
+
     valid_data = TwemojiData("valid", shuffle=False, batch_size=64, nrows=1000)
     zero_shot_data = TwemojiData(
         "extra_zero", shuffle=False, batch_size=64, nrows=10000
     )
+    zero_shot_data.df = zero_shot_data.df.loc[
+        zero_shot_data.df.emoji_ids.apply(len) == 1
+    ].reset_index(drop=True)
 
     emoji_description_path = os.path.join(
         get_project_root(), "emoji_embedding/data/processed/emoji_descriptions.csv"
@@ -68,4 +75,4 @@ if __name__ == "__main__":
         k: v for k, v in zip(emoji_description.emoji_id, emoji_description.emoji_char)
     }
 
-    print_outputs(model, zero_shot_data)
+    print_outputs(model, valid_data, seed=1)
