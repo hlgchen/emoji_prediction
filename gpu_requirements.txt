@@ -11,3 +11,4 @@ transformers
 gensim==4.1.2
 transformers==4.16.2
 emoji
+sentence_transformers==2.2.0
