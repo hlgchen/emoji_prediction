@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import DistilBertTokenizer, DistilBertModel, BertConfig
+from sentence_transformers import SentenceTransformer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -89,6 +90,97 @@ class SimpleEmbert(nn.Module):
         return out
 
 
+class SimpleSembert(nn.Module):
+    def __init__(self, mode="avg"):
+        super(SimpleSembert, self).__init__()
+        self.emoji_embeddings = nn.Parameter(
+            get_emoji_fixed_embedding(image=True, bert=True, wordvector=False),
+            requires_grad=False,
+        )
+        self.emoji_embedding_size = self.emoji_embeddings.size(1)
+
+        model_name = "all-MiniLM-L12-v2"
+        self.model = SentenceTransformer(model_name, device=device)
+        self.sentence_embedding_size = self.model.get_sentence_embedding_dimension()
+
+        self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
+        self.linear2 = nn.Linear(self.emoji_embedding_size, 500)
+
+    def forward(self, sentence_ls, emoji_ids):
+
+        sentences_embeddings = self.model.encode(sentence_ls, convert_to_tensor=True)
+        emoji_embeddings = self.emoji_embeddings[emoji_ids]
+
+        X_1 = sentences_embeddings.repeat_interleave(len(emoji_ids), dim=0)
+        X_2 = emoji_embeddings.repeat(len(sentence_ls), 1)
+
+        X_1 = self.linear1(X_1)
+        X_2 = self.linear2(X_2)
+
+        out = (X_1 * X_2).sum(dim=1).view(-1, len(emoji_ids))
+        out = F.softmax(out, dim=1)
+
+        return out
+
+
+class SimpleEmbertTriplet(nn.Module):
+    def __init__(self, mode="avg"):
+        super(SimpleEmbertTriplet, self).__init__()
+        self.emoji_embeddings = nn.Parameter(
+            get_emoji_fixed_embedding(image=True, bert=True, wordvector=False),
+            requires_grad=False,
+        )
+        self.emoji_embedding_size = self.emoji_embeddings.size(1)
+
+        base_model_name = "distilbert-base-uncased"
+        self.tokenizer = DistilBertTokenizer.from_pretrained(base_model_name)
+        self.model = DistilBertModel.from_pretrained(base_model_name)
+        self.mode = mode if mode in ["avg", "last"] else "avg"
+        self.sentence_embedding_size = BertConfig.from_pretrained(
+            base_model_name
+        ).hidden_size
+
+        self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
+        self.linear2 = nn.Linear(self.emoji_embedding_size, 500)
+
+    def forward(self, sentence_ls, emoji_ids):
+        encoded_input = self.tokenizer(
+            sentence_ls, return_tensors="pt", truncation=True, padding=True
+        )
+
+        input_ids = encoded_input["input_ids"].to(device)
+        attention_mask = encoded_input["attention_mask"].to(device)
+        text_model_output = self.model(
+            input_ids=input_ids, attention_mask=attention_mask
+        ).last_hidden_state
+
+        sentence_embedding_ls = []
+        if self.mode == "avg":
+            for i, l in enumerate(encoded_input.attention_mask.sum(dim=1).tolist()):
+                sentence_embedding_ls.append(text_model_output[i, :l].mean(dim=0))
+        else:
+            for i, l in enumerate(encoded_input.attention_mask.sum(dim=1).tolist()):
+                sentence_embedding_ls.append(text_model_output[i, l - 1])
+
+        sentences_embeddings = torch.stack(sentence_embedding_ls)
+        emoji_embeddings = self.emoji_embeddings[emoji_ids]
+
+        X_1 = sentences_embeddings.repeat_interleave(len(emoji_ids), dim=0)
+        X_2 = emoji_embeddings.repeat(len(sentence_ls), 1)
+
+        X_1 = self.linear1(X_1)
+        X_2 = self.linear2(X_2)
+
+        out = (X_1 * X_2).sum(dim=1).view(-1, len(emoji_ids))
+        out = F.softmax(out, dim=1)
+
+        return (
+            out,
+            X_1.view(-1, len(emoji_ids), X_1.shape[1]),
+            X_2.view(-1, len(emoji_ids), X_2.shape[1]),
+        )
+
+
 def get_emoji_descriptions():
 
     description_path = os.path.join(
@@ -108,7 +200,6 @@ def get_emoji_descriptions():
 class Embert(nn.Module):
     def __init__(self, mode="avg"):
         super(Embert, self).__init__()
-        self.descriptions = get_emoji_descriptions()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=True, bert=False, wordvector=False),
             requires_grad=False,
@@ -117,6 +208,10 @@ class Embert(nn.Module):
         base_model_name = "distilbert-base-uncased"
         self.tokenizer = DistilBertTokenizer.from_pretrained(base_model_name)
         self.emoji_bert = DistilBertModel.from_pretrained(base_model_name)
+        for name, param in self.emoji_bert.named_parameters():
+            if "5" not in name:
+                param.requires_grad = False
+
         self.model = DistilBertModel.from_pretrained(base_model_name)
         self.mode = mode if mode in ["avg", "last"] else "avg"
 
@@ -127,19 +222,33 @@ class Embert(nn.Module):
             self.emoji_embeddings.size(1) + self.sentence_embedding_size
         )
 
+        descriptions = get_emoji_descriptions().tolist()
+        self.dtoken = self.tokenizer(
+            descriptions, return_tensors="pt", truncation=True, padding=True
+        )
+
         self.linear1 = nn.Linear(self.sentence_embedding_size, 200)
         self.linear2 = nn.Linear(self.emoji_embedding_size, 200)
 
-    def partial_forward(self, sentence_ls, model):
-        encoded_input = self.tokenizer(
-            sentence_ls, return_tensors="pt", truncation=True, padding=True
-        )
+    def partial_forward(self, sentence_ls, model, batch_size):
+        if isinstance(sentence_ls, list):
+            encoded_input = self.tokenizer(
+                sentence_ls, return_tensors="pt", truncation=True, padding=True
+            )
+        else:
+            encoded_input = sentence_ls
 
-        input_ids = encoded_input["input_ids"].to(device)
-        attention_mask = encoded_input["attention_mask"].to(device)
-        text_model_output = model(
-            input_ids=input_ids, attention_mask=attention_mask
-        ).last_hidden_state
+        input_id_ls = torch.split(encoded_input["input_ids"].to(device), batch_size)
+        attention_mask_ls = torch.split(
+            encoded_input["attention_mask"].to(device), batch_size
+        )
+        model_output_ls = []
+        for input_ids, attention_mask in zip(input_id_ls, attention_mask_ls):
+            temp = model(
+                input_ids=input_ids, attention_mask=attention_mask
+            ).last_hidden_state
+            model_output_ls.append(temp)
+        text_model_output = torch.cat(model_output_ls, dim=0)
 
         sentence_embedding_ls = []
         if self.mode == "avg":
@@ -153,12 +262,21 @@ class Embert(nn.Module):
         return sentences_embeddings
 
     def forward(self, sentence_ls, emoji_ids):
+        batch_size = len(sentence_ls)
+
         # handle twitter text
-        sentences_embeddings = self.partial_forward(sentence_ls, self.model)
+        sentences_embeddings = self.partial_forward(sentence_ls, self.model, batch_size)
 
         # handle emoji embedding
-        description_ls = self.descriptions[emoji_ids].tolist()
-        description_embeddings = self.partial_forward(description_ls, self.emoji_bert)
+        dtoken_input_ids = self.dtoken["input_ids"][emoji_ids]
+        dtoken_attention_mask = self.dtoken["attention_mask"][emoji_ids]
+        description_tokens = {
+            "input_ids": dtoken_input_ids,
+            "attention_mask": dtoken_attention_mask,
+        }
+        description_embeddings = self.partial_forward(
+            description_tokens, self.emoji_bert, batch_size
+        )
         img_embedding = self.emoji_embeddings[emoji_ids]
         emoji_embeddings = torch.cat(img_embedding, description_embeddings, dim=1)
 
@@ -209,3 +327,12 @@ class Accuracy(nn.Module):
                 len(predicted_emojis.intersection(y)) / len(y)
             )
         return accuracy
+
+
+class CosineDistance(nn.Module):
+    def __init__(self):
+        super(CosineDistance, self).__init__()
+        self.cos_sim = nn.CosineSimilarity()
+
+    def forward(self, x, y):
+        return 1 - self.cos_sim(x, y)

@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from pprint import pprint
 from emoji_embedding.utils import model_summary
-from embert import EmbertLoss, Accuracy, SimpleEmbert, Embert
+from embert import EmbertLoss, Accuracy, SimpleSembert, Embert
 from twemoji.twemoji_dataset import TwemojiData, TwemojiDataChunks
 import re
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     # pretrained_path = "/content/drive/MyDrive/cs224n_project/trained_models/run1/simple_embert_chunk2.ckpt"
     pretrained_path = None
-    model = SimpleEmbert()
+    model = SimpleSembert()
     model.train()
     model = model.to(device)
     start_chunk = 0
@@ -137,11 +137,13 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(pretrained_path, map_location=device))
         start_chunk = int(re.findall(r"\d+", pretrained_path.split("/")[-1])[0])
         print(f"loaded pretrained params from: {pretrained_path}")
-    pprint(model_summary(model))
+    # pprint(model_summary(model))
+    print(model_summary(model, verbose=False, only_trainable=False))
+    print(model_summary(model, verbose=False, only_trainable=True))
 
     seed = np.random.randint(100000)
     train_data_chunks = TwemojiDataChunks(
-        "train", chunksize=64000, shuffle=True, batch_size=64, seed=seed
+        "train", chunksize=64000, shuffle=True, batch_size=16, seed=seed
     )
     valid_data = TwemojiData(
         "valid", shuffle=True, batch_size=64, limit=6400, seed=seed
@@ -149,10 +151,14 @@ if __name__ == "__main__":
     dataloader_ls = [
         {"train": train_data, "valid": valid_data} for train_data in train_data_chunks
     ]
+    # valid_data = TwemojiData("valid", shuffle=True, batch_size=32, seed=seed, nrows=32)
+    # dataloader_ls = [{"train": valid_data, "valid": valid_data} for _ in range(200)]
 
     criterion = EmbertLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
-    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=5e-5)
+    # scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=1)
 
     train_model(
         model,
@@ -161,7 +167,7 @@ if __name__ == "__main__":
         optimizer,
         scheduler=scheduler,
         num_epochs=1000,
-        name="simple_embert",
+        name="sembert",
         start_chunk=start_chunk,
         # base = "/content/drive/MyDrive/cs224n_project/trained_models/run1"
     )
