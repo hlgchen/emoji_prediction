@@ -38,9 +38,9 @@ def get_dataset(df, n_triplets):
     ]
 
     # create list of correct emoji description sentences
-    des_df["correct_selection"] = des_df.emjpd_description_main.str.split(
-        ". ", regex=False
-    ) + des_df.hemj_emoji_description.fillna("").str.split(". ", regex=False)
+    des_df["correct_selection"] = des_df.emjpd_description_main.apply(
+        lambda x: x.split(". ")
+    ) + des_df.hemj_emoji_description.fillna("").apply(lambda x: x.split(". "))
     des_df.correct_selection = des_df.correct_selection.apply(
         lambda x: [s.strip() for s in x if len(s) > 3]
     )

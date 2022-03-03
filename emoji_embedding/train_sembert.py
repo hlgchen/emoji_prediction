@@ -14,7 +14,15 @@ from tqdm import tqdm
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def train_model(model, dataloaders, criterion, optimizer, num_epochs, name):
+def train_model(
+    model,
+    dataloaders,
+    criterion,
+    optimizer,
+    num_epochs,
+    name,
+    base=None,
+):
     """ """
     start_time_training = time()
 
