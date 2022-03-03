@@ -4,7 +4,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import DistilBertTokenizer, DistilBertModel, BertConfig
+from transformers import (
+    DistilBertTokenizer,
+    DistilBertModel,
+    BertConfig,
+    AutoModel,
+    AutoTokenizer,
+)
 from sentence_transformers import SentenceTransformer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -34,6 +40,18 @@ def get_emoji_fixed_embedding(image=True, bert=True, wordvector=False):
     emoji_embeddings = torch.cat(emb_ls, dim=-1)
 
     return emoji_embeddings
+
+
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output[
+        0
+    ]  # First element of model_output contains all token embeddings
+    input_mask_expanded = (
+        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    )
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
+        input_mask_expanded.sum(1), min=1e-9
+    )
 
 
 class SimpleEmbert(nn.Module):
@@ -100,18 +118,35 @@ class SimpleSembert(nn.Module):
         self.emoji_embedding_size = self.emoji_embeddings.size(1)
 
         model_name = "all-MiniLM-L12-v2"
-        self.model = SentenceTransformer(model_name, device=device)
-        self.sentence_embedding_size = self.model.get_sentence_embedding_dimension()
+        # model_name = "all-distilroberta-v1"
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            f"sentence-transformers/{model_name}"
+        )
+        self.model = AutoModel.from_pretrained(f"sentence-transformers/{model_name}")
+        self.sentence_embedding_size = 384
 
         self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
         self.linear2 = nn.Linear(self.emoji_embedding_size, 500)
 
     def forward(self, sentence_ls, emoji_ids):
 
-        sentences_embeddings = self.model.encode(sentence_ls, convert_to_tensor=True)
+        encoded_input = self.tokenizer(
+            sentence_ls,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+            max_length=128,
+        )
+
+        input_ids = encoded_input["input_ids"].to(device)
+        attention_mask = encoded_input["attention_mask"].to(device)
+        model_output = self.model(input_ids=input_ids, attention_mask=attention_mask)
+        embeddings = mean_pooling(model_output, attention_mask)
+        sentence_embeddings = F.normalize(embeddings, p=2, dim=1)
+
         emoji_embeddings = self.emoji_embeddings[emoji_ids]
 
-        X_1 = sentences_embeddings.repeat_interleave(len(emoji_ids), dim=0)
+        X_1 = sentence_embeddings.repeat_interleave(len(emoji_ids), dim=0)
         X_2 = emoji_embeddings.repeat(len(sentence_ls), 1)
 
         X_1 = self.linear1(X_1)
