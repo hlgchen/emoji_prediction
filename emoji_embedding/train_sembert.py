@@ -6,7 +6,7 @@ import copy
 import pandas as pd
 
 from emoji_description_dataset import EDDataset
-from ee_model import DescriptionSembert
+from ee_model import DescriptionSembert, CosineDistance
 import utils
 import os
 from tqdm import tqdm
@@ -61,9 +61,13 @@ def train_model(
 
                     # statistics
                     running_loss += loss.item() * anchor.size(0)
+                    pos_dot_product = (anchor * positives).sum(dim=1).mean().item()
+                    neg_dot_product = (anchor * negatives).sum(dim=1).mean().item()
                     tbatch.set_postfix(
                         loss=loss.item() * anchor.size(0),
                         running_loss=running_loss / (i + 1),
+                        avg_pos_dot_product=pos_dot_product,
+                        avg_neg_dot_product=neg_dot_product,
                     )
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
@@ -85,21 +89,20 @@ def train_model(
             )
         )
         print("-" * 10)
-        if epoch % 5 == 0:
-            if base is None:
-                base = os.path.join(
-                    utils.get_project_root(), f"emoji_embedding/model/text_{name}/"
-                )
-            if not os.path.exists(base):
-                os.makedirs(base)
-            torch.save(
-                model.state_dict(),
-                os.path.join(
-                    base,
-                    f"bert_{name}_epoch{epoch}.ckpt",
-                ),
+        if base is None:
+            base = os.path.join(
+                utils.get_project_root(), f"emoji_embedding/model/text_{name}/"
             )
-            print("model saved")
+        if not os.path.exists(base):
+            os.makedirs(base)
+        torch.save(
+            model.state_dict(),
+            os.path.join(
+                base,
+                f"bert_{name}_epoch{epoch}.ckpt",
+            ),
+        )
+        print("model saved")
 
     time_elapsed = time() - start_time_training
     print(
@@ -133,7 +136,9 @@ if __name__ == "__main__":
     print(utils.model_summary(model, verbose=False, only_trainable=True))
     print(utils.model_summary(model, verbose=False, only_trainable=False))
 
-    criterion = nn.TripletMarginLoss(margin=10.0)
+    criterion = nn.TripletMarginWithDistanceLoss(
+        distance_function=CosineDistance(), margin=1
+    )
     optimizer = torch.optim.Adam(model.parameters())
 
     train_model(

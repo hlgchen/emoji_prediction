@@ -93,3 +93,12 @@ class ContrastiveLoss(torch.nn.Module):
         )
 
         return loss
+
+
+class CosineDistance(nn.Module):
+    def __init__(self):
+        super(CosineDistance, self).__init__()
+        self.cos_sim = nn.CosineSimilarity()
+
+    def forward(self, x, y):
+        return 1 - self.cos_sim(x, y)
