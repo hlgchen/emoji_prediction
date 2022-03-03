@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from transformers import AutoTokenizer, AutoModel
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -27,6 +28,48 @@ class Img2Vec(nn.Module):
     def forward(self, x):
         x = self.resnet(x)
         return x
+
+
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output[
+        0
+    ]  # First element of model_output contains all token embeddings
+    input_mask_expanded = (
+        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    )
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
+        input_mask_expanded.sum(1), min=1e-9
+    )
+
+
+class DescriptionSembert(nn.Module):
+    def __init__(self, pretrained_path=None):
+        super(DescriptionSembert, self).__init__()
+
+        model_name = "all-MiniLM-L6-v2"
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            f"sentence-transformers/{model_name}"
+        )
+        self.model = AutoModel.from_pretrained(f"sentence-transformers/{model_name}")
+        if pretrained_path is not None:
+            self.load_state_dict(torch.load(pretrained_path, map_location=device))
+
+    def forward(self, description_ls):
+        encoded_input = self.tokenizer(
+            description_ls,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+            max_length=256,
+        )
+
+        input_ids = encoded_input["input_ids"].to(device)
+        attention_mask = encoded_input["attention_mask"].to(device)
+        model_output = self.model(input_ids=input_ids, attention_mask=attention_mask)
+        embeddings = mean_pooling(model_output, attention_mask)
+        sentence_embeddings = F.normalize(embeddings, p=2, dim=1)
+
+        return sentence_embeddings
 
 
 class ContrastiveLoss(torch.nn.Module):
