@@ -78,9 +78,10 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs, name):
         )
         print("-" * 10)
         if epoch % 5 == 0:
-            base = os.path.join(
-                utils.get_project_root(), f"emoji_embedding/model/text_{name}/"
-            )
+            if base is None:
+                base = os.path.join(
+                    utils.get_project_root(), f"emoji_embedding/model/text_{name}/"
+                )
             if not os.path.exists(base):
                 os.makedirs(base)
             torch.save(
@@ -134,4 +135,5 @@ if __name__ == "__main__":
         optimizer=optimizer,
         num_epochs=42,
         name="description_sembert",
+        base="/content/drive/MyDrive/cs224n_project/trained_models/decription_sembert",
     )
