@@ -37,7 +37,6 @@ class TwemojiData:
         )
         self.shuffle = shuffle
         self.batch_size = batch_size
-        self.n_samples = len(self.df)
         self.limit = limit
         self.text_col = text_col
 
@@ -52,9 +51,7 @@ class TwemojiData:
         text, labels = self.get_lists()
 
         limit = (
-            min(self.n_samples, self.limit)
-            if self.limit is not None
-            else self.n_samples
+            min(len(self.df), self.limit) if self.limit is not None else len(self.df)
         )
         for start in range(0, limit, self.batch_size):
             end = min(start + self.batch_size, limit)
