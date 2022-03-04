@@ -169,7 +169,7 @@ if __name__ == "__main__":
 
     # load datasets
     dataset = TwemojiData(
-        dataset_name, shuffle=False, batch_size=128, nrows=nrows, text_col=text_col
+        dataset_name, shuffle=False, batch_size=64, nrows=nrows, text_col=text_col
     )
     if l1:
         dataset = dataset.loc[dataset.df.emoji_ids.apply(len) == 1].reset_index(
