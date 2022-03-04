@@ -10,7 +10,14 @@ def get_project_root():
 
 class TwemojiData:
     def __init__(
-        self, data, nrows=None, shuffle=False, batch_size=64, limit=None, seed=1
+        self,
+        data,
+        nrows=None,
+        shuffle=False,
+        batch_size=64,
+        limit=None,
+        text_col="text_no_emojis",
+        seed=1,
     ):
         np.random.seed(seed)
         if isinstance(data, str):
@@ -18,7 +25,7 @@ class TwemojiData:
                 get_project_root(), f"twemoji/data/twemoji_{data}.csv"
             )
             self.df = pd.read_csv(
-                twemoji_path, usecols=["text_no_emojis", "emoji_ids"], nrows=nrows
+                twemoji_path, usecols=[text_col, "emoji_ids"], nrows=nrows
             )
         else:
             self.df = data
@@ -61,7 +68,13 @@ class TwemojiData:
 
 class TwemojiDataChunks:
     def __init__(
-        self, dataset_type, chunksize=64000, shuffle=False, batch_size=64, seed=1
+        self,
+        dataset_type,
+        chunksize=64000,
+        shuffle=False,
+        batch_size=64,
+        text_col="text_no_emojis",
+        seed=1,
     ):
         print(f"random seed is: {seed}")
         np.random.seed(seed)
@@ -70,14 +83,20 @@ class TwemojiDataChunks:
         )
         df = pd.read_csv(
             twemoji_path,
-            usecols=["text_no_emojis", "emoji_ids"],
+            usecols=[text_col, "emoji_ids"],
         )
         if shuffle:
             df = df.sample(frac=1).reset_index(drop=True)
 
         df_ls = [df[i : i + chunksize] for i in range(0, len(df), chunksize)]
         self.data_ls = [
-            TwemojiData(df, shuffle=shuffle, batch_size=batch_size) for df in df_ls
+            TwemojiData(
+                df,
+                shuffle=shuffle,
+                batch_size=batch_size,
+                text_col=text_col,
+            )
+            for df in df_ls
         ]
         self.n_chunks = len(self.data_ls)
 

@@ -127,7 +127,7 @@ def train_model(
 
 if __name__ == "__main__":
 
-    # pretrained_path = "/content/drive/MyDrive/cs224n_project/trained_models/run1/simple_embert_chunk2.ckpt"
+    # pretrained_path = "/content/drive/MyDrive/cs224n_project/trained_models/sembert_cased_min2/sembert_chunk2.ckpt"
     pretrained_path = None
     model = SimpleSembert()
     model.train()
@@ -143,10 +143,20 @@ if __name__ == "__main__":
 
     seed = np.random.randint(100000)
     train_data_chunks = TwemojiDataChunks(
-        "train", chunksize=64000, shuffle=True, batch_size=64, seed=seed
+        "train_v2_min_2",
+        chunksize=64000,
+        shuffle=True,
+        batch_size=64,
+        seed=seed,
+        text_col="text_no_emojis",
     )
     valid_data = TwemojiData(
-        "valid", shuffle=True, batch_size=64, limit=6400, seed=seed
+        "valid_v2_min_2",
+        shuffle=True,
+        batch_size=64,
+        limit=6400,
+        seed=seed,
+        text_col="text_no_emojis",
     )
     dataloader_ls = [
         {"train": train_data, "valid": valid_data} for train_data in train_data_chunks
@@ -167,5 +177,5 @@ if __name__ == "__main__":
         num_epochs=1000,
         name="sembert",
         start_chunk=start_chunk,
-        # base = "/content/drive/MyDrive/cs224n_project/trained_models/run1"
+        base="/content/drive/MyDrive/cs224n_project/trained_models/sembert_cased_min2",
     )

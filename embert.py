@@ -11,7 +11,6 @@ from transformers import (
     AutoModel,
     AutoTokenizer,
 )
-from sentence_transformers import SentenceTransformer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -117,13 +116,14 @@ class SimpleSembert(nn.Module):
         )
         self.emoji_embedding_size = self.emoji_embeddings.size(1)
 
-        model_name = "all-MiniLM-L12-v2"
-        # model_name = "all-distilroberta-v1"
+        # model_name = "all-MiniLM-L12-v2"
+        model_name = "all-distilroberta-v1"
         self.tokenizer = AutoTokenizer.from_pretrained(
             f"sentence-transformers/{model_name}"
         )
         self.model = AutoModel.from_pretrained(f"sentence-transformers/{model_name}")
-        self.sentence_embedding_size = 384
+        # self.sentence_embedding_size = 384
+        self.sentence_embedding_size = 768
 
         self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
         self.linear2 = nn.Linear(self.emoji_embedding_size, 500)
