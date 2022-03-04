@@ -188,7 +188,7 @@ if __name__ == "__main__":
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
-        s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows}\n"
+        s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows}\n restricted to 1 emoji {l1}"
         s += f"Accuracy with top {k} prediction is {total_accuracy}\n\n"
 
         file_path = os.path.join(save_path, f"evaluation.txt")
