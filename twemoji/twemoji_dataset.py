@@ -39,6 +39,7 @@ class TwemojiData:
         self.batch_size = batch_size
         self.n_samples = len(self.df)
         self.limit = limit
+        self.text_col = text_col
 
     def get_lists(self):
         labels = self.df.emoji_ids.tolist()
