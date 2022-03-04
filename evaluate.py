@@ -5,9 +5,10 @@ import torch
 import pandas as pd
 from tqdm import tqdm
 
-from embert import Accuracy, SimpleEmbert, TopKAccuracy
+from embert import Accuracy, SimpleSembert, TopKAccuracy
 from twemoji.twemoji_dataset import TwemojiData
 import re
+import argparse
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -81,16 +82,83 @@ def evaluate_on_dataset(model, data, k=1):
                 batch_accuracy=batch_accuracy,
                 running_accuracy=accuracy / counter,
             )
-    print(f"total accuracy is {accuracy/counter}")
+
+    total_accuracy = accuracy / counter
+    print(f"total accuracy is {total_accuracy}")
+    return total_accuracy
 
 
 if __name__ == "__main__":
 
-    # load model
-    pretrained_path = os.path.join(
-        get_project_root(), "trained_models/run1/simple_embert_chunk13.ckpt"
+    argp = argparse.ArgumentParser()
+    argp.add_argument(
+        "model_name",
+        help="Which model to use for evaluation",
+        choices=[
+            "sembert_chunk14",
+            "sembert_cased_min3_clean_chunk30",
+            "sembert_cased_min3_chunk27",
+            "sembert_cased_chunk26",
+        ],
     )
-    model = SimpleEmbert()
+    argp.add_argument(
+        "dataset_name",
+        help="Which dataset to do evaluation on",
+        choices=[
+            "train",
+            "train_v2",
+            "train_v2_min_2",
+            "valid",
+            "valid_v2",
+            "valid_v2_min_2",
+            "test",
+            "test_v2",
+            "test_v2_min_2",
+            "extra_zero",
+            "extra_zero_v2",
+            "extra_zero_v2_min_2",
+        ],
+    )
+    argp.add_argument(
+        "--l1",
+        help="Whether to only include tweets with one single emoji",
+        default=False,
+    )
+    argp.add_argument(
+        "--function",
+        help="Whether to print example predictions or to do full on evaluation",
+        choices=["evaluate", "samples"],
+        default="evaluate",
+    )
+    argp.add_argument(
+        "--nrows",
+        help="Number of rows to load from the dataset",
+        default=None,
+    )
+    argp.add_argument(
+        "--k", help="K to specify top k prediction in evaluate", default=1
+    )
+    argp.add_argument(
+        "--text_col", help="Column to use for evaluation", default="text_no_emojis"
+    )
+    argp.add_argument("--n_samples", help="n samples for samples function", default=32)
+    argp.add_argument("--outputs_path", default=None)
+    args = argp.parse_args()
+
+    # load model
+    model_name = args.model_name
+    dataset_name = args.dataset_name
+    l1 = args.l1
+    function = args.function
+    nrows = int(args.nrows) if args.nrows is not None else args.nrows
+    k = int(args.k)
+    n_samples = int(args.n_samples)
+    text_col = args.text_col
+
+    pretrained_path = os.path.join(
+        get_project_root(), f"trained_models/run1/{model_name}.ckpt"
+    )
+    model = SimpleSembert()
     model = model.to(device)
     if pretrained_path is not None:
         model.load_state_dict(torch.load(pretrained_path, map_location=device))
@@ -100,14 +168,27 @@ if __name__ == "__main__":
     # pprint(model)
 
     # load datasets
-    # valid_data = TwemojiData("valid", shuffle=False, batch_size=64, nrows=1000)
-    test_data = TwemojiData("test", shuffle=False, batch_size=64, nrows=1000)
-    # zero_shot_data = TwemojiData(
-    #     "extra_zero", shuffle=False, batch_size=64, nrows=10000
-    # )
-    # zero_shot_data.df = zero_shot_data.df.loc[
-    #     zero_shot_data.df.emoji_ids.apply(len) == 1
-    # ].reset_index(drop=True)
+    dataset = TwemojiData(
+        dataset_name, shuffle=False, batch_size=64, nrows=nrows, text_col=text_col
+    )
+    if l1:
+        dataset = dataset.loc[dataset.df.emoji_ids.apply(len) == 1].reset_index(
+            drop=True
+        )
 
-    # print_samples(model, valid_data, n_samples=32, seed=2)
-    evaluate_on_dataset(model, test_data, k=10)
+    # make calcualtions
+    if function == "samples":
+        print_samples(model, dataset, n_samples=n_samples, seed=2)
+    elif function == "evaluate":
+        total_accuracy = evaluate_on_dataset(model, dataset, k=k)
+
+        save_path = os.path.join(get_project_root(), f"evaluation")
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+
+        s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows}\n"
+        s += f"Accuracy with top {k} prediction is {total_accuracy}\n\n"
+
+        file_path = os.path.join(save_path, f"evaluation.txt")
+        with open(file_path, "a+") as f:
+            f.write(s)
