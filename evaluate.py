@@ -148,7 +148,7 @@ if __name__ == "__main__":
     # load model
     model_name = args.model_name
     dataset_name = args.dataset_name
-    l1 = args.l1
+    l1 = bool(args.l1) if isinstance(args.l1, str) else args.l1
     function = args.function
     nrows = int(args.nrows) if args.nrows is not None else args.nrows
     k = int(args.k)
@@ -172,13 +172,15 @@ if __name__ == "__main__":
         dataset_name, shuffle=False, batch_size=64, nrows=nrows, text_col=text_col
     )
     if l1:
-        dataset = dataset.loc[dataset.df.emoji_ids.apply(len) == 1].reset_index(
+        dataset.df = dataset.df.loc[dataset.df.emoji_ids.apply(len) == 1].reset_index(
             drop=True
         )
 
     # make calcualtions
     if function == "samples":
-        print_samples(model, dataset, n_samples=n_samples, seed=2)
+        print_samples(
+            model, dataset, n_samples=n_samples, seed=np.random.randint(0, 200000)
+        )
     elif function == "evaluate":
         total_accuracy = evaluate_on_dataset(model, dataset, k=k)
 
