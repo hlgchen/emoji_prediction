@@ -42,7 +42,7 @@ class TwemojiData:
 
     def get_lists(self):
         labels = self.df.emoji_ids.tolist()
-        text = self.df.text_no_emojis.tolist()
+        text = self.df[self.text_col].tolist()
         return text, labels
 
     def __iter__(self):
@@ -60,7 +60,7 @@ class TwemojiData:
             yield text[start:end], labels[start:end]
 
     def __getitem__(self, idx):
-        return self.df.text_no_emojis.tolist()[idx], self.df.emoji_ids.tolist()[idx]
+        return self.df[self.text_col].tolist()[idx], self.df.emoji_ids.tolist()[idx]
 
     def __len__(self):
         return len(self.df)
