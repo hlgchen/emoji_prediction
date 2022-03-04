@@ -371,3 +371,24 @@ class CosineDistance(nn.Module):
 
     def forward(self, x, y):
         return 1 - self.cos_sim(x, y)
+
+
+class TopKAccuracy(nn.Module):
+    """Top K accuracy score similar to the one used in
+        Spencer Cappallo, Stacey Svetlichnaya, Pierre Garrigues, Thomas Mensink, and Cees GM
+    Snoek. New modality: Emoji challenges in prediction, anticipation, and retrieval.
+
+        It is counted as a success if at least one emoji in the top k predictions was correct."""
+
+    def __init__(self, k):
+        super(TopKAccuracy, self).__init__()
+        self.k = k
+
+    def forward(self, probas, labels):
+        accuracy = 0
+        for i in range(len(probas)):
+            y = set(labels[i])
+            predicted_emojis = torch.topk(probas[i], self.k)[1]
+            predicted_emojis = set(predicted_emojis.tolist())
+            accuracy += (1 / len(labels)) * (len(predicted_emojis.intersection(y)) > 0)
+        return accuracy

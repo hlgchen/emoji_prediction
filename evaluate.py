@@ -3,8 +3,9 @@ from pprint import pprint
 import numpy as np
 import torch
 import pandas as pd
+from tqdm import tqdm
 
-from embert import Accuracy, SimpleEmbert
+from embert import Accuracy, SimpleEmbert, TopKAccuracy
 from twemoji.twemoji_dataset import TwemojiData
 import re
 
@@ -19,12 +20,32 @@ def get_project_root():
     return os.path.dirname(os.path.abspath(__file__))
 
 
-def print_outputs(model, data, seed=5):
-    seed = np.random.seed(seed)
-    i = np.random.randint(0, len(data) - 32)
+def get_emoji_id_to_char():
+    emoji_description_path = os.path.join(
+        get_project_root(), "emoji_embedding/data/processed/emoji_descriptions.csv"
+    )
+    emoji_description = pd.read_csv(
+        emoji_description_path, usecols=["emoji_id", "emoji_char"]
+    )
+    emoji_id_char = {
+        k: v for k, v in zip(emoji_description.emoji_id, emoji_description.emoji_char)
+    }
+    return emoji_id_char
 
-    X = data[i : i + 32][0]
-    y = data[i : i + 32][1]
+
+def print_samples(
+    model,
+    data,
+    n_samples=32,
+    seed=5,
+):
+
+    emoji_id_char = get_emoji_id_to_char()
+    seed = np.random.seed(seed)
+    i = np.random.randint(0, len(data) - n_samples)
+
+    X = data[i : i + n_samples][0]
+    y = data[i : i + n_samples][1]
     y_emojis = [[emoji_id_char[em] for em in row] for row in y]
 
     outputs = model(X, TEST_IDX)
@@ -43,7 +64,29 @@ def print_outputs(model, data, seed=5):
         print("*" * 20)
 
 
+def evaluate_on_dataset(model, data, k=1):
+    accuracy = 0
+    counter = 0
+    score = TopKAccuracy(k)
+    with tqdm(enumerate(data)) as tbatch:
+        for i, batch in tbatch:
+            X = batch[0]
+            y = batch[1]
+            outputs = model(X, TEST_IDX)
+            batch_accuracy = score(outputs, y)
+            accuracy += len(X) * batch_accuracy
+            counter += len(X)
+
+            tbatch.set_postfix(
+                batch_accuracy=batch_accuracy,
+                running_accuracy=accuracy / counter,
+            )
+    print(f"total accuracy is {accuracy/counter}")
+
+
 if __name__ == "__main__":
+
+    # load model
     pretrained_path = os.path.join(
         get_project_root(), "trained_models/run1/simple_embert_chunk13.ckpt"
     )
@@ -54,25 +97,17 @@ if __name__ == "__main__":
         start_chunk = int(re.findall(r"\d+", pretrained_path.split("/")[-1])[0])
         print(f"loaded pretrained params from: {pretrained_path}")
     model.eval()
+    # pprint(model)
 
-    pprint(model)
+    # load datasets
+    # valid_data = TwemojiData("valid", shuffle=False, batch_size=64, nrows=1000)
+    test_data = TwemojiData("test", shuffle=False, batch_size=64, nrows=1000)
+    # zero_shot_data = TwemojiData(
+    #     "extra_zero", shuffle=False, batch_size=64, nrows=10000
+    # )
+    # zero_shot_data.df = zero_shot_data.df.loc[
+    #     zero_shot_data.df.emoji_ids.apply(len) == 1
+    # ].reset_index(drop=True)
 
-    valid_data = TwemojiData("valid", shuffle=False, batch_size=64, nrows=1000)
-    zero_shot_data = TwemojiData(
-        "extra_zero", shuffle=False, batch_size=64, nrows=10000
-    )
-    zero_shot_data.df = zero_shot_data.df.loc[
-        zero_shot_data.df.emoji_ids.apply(len) == 1
-    ].reset_index(drop=True)
-
-    emoji_description_path = os.path.join(
-        get_project_root(), "emoji_embedding/data/processed/emoji_descriptions.csv"
-    )
-    emoji_description = pd.read_csv(
-        emoji_description_path, usecols=["emoji_id", "emoji_char"]
-    )
-    emoji_id_char = {
-        k: v for k, v in zip(emoji_description.emoji_id, emoji_description.emoji_char)
-    }
-
-    print_outputs(model, valid_data, seed=1)
+    # print_samples(model, valid_data, n_samples=32, seed=2)
+    evaluate_on_dataset(model, test_data, k=10)
