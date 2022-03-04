@@ -133,7 +133,7 @@ if __name__ == "__main__":
     argp.add_argument(
         "--nrows",
         help="Number of rows to load from the dataset",
-        default=None,
+        default=200000,
     )
     argp.add_argument(
         "--k", help="K to specify top k prediction in evaluate", default=1
@@ -169,7 +169,7 @@ if __name__ == "__main__":
 
     # load datasets
     dataset = TwemojiData(
-        dataset_name, shuffle=False, batch_size=64, nrows=nrows, text_col=text_col
+        dataset_name, shuffle=False, batch_size=256, nrows=nrows, text_col=text_col
     )
     if l1:
         dataset = dataset.loc[dataset.df.emoji_ids.apply(len) == 1].reset_index(
