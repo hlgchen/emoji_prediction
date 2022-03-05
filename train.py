@@ -2,14 +2,14 @@ import os
 from time import time
 import numpy as np
 import torch
-import torch.nn as nn
 from tqdm import tqdm
 
-from pprint import pprint
 from emoji_embedding.utils import model_summary
-from embert import EmbertLoss, Accuracy, SimpleSembert, Embert
+from embert import EmbertLoss, Accuracy, SimpleSembert
 from twemoji.twemoji_dataset import TwemojiData, TwemojiDataChunks
 import re
+import logging
+import shutil
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -33,20 +33,44 @@ def train_model(
     name,
     start_chunk,
     base=None,
+    save_every=2,
+    run_name="main_run",
 ):
     """
     Trains model with specified setup. Models are saved after every chunk.
 
     Params:
-        - model {torch.nn.Module}: model to be trained. For the task at hand this isa version of embert
+        - model {torch.nn.Module}: model to be trained.
         - dataloader_ls {list}: list of dictionaries containing the dataloaders. The dictionaries are expected
                                 to contain dataloaders for train and valid.
         - criterion {torch loss function}: for the task at hand, this is the embertloss
         - optimizer {torch optimizer}: optimizer for training, i.e. adam
         - num_epochs {int}: number of epochs to train.
         - name {str}: name of the model to be saved
+        - start_chunk {int}: this is zero in general but if there was a warmstart the startchunk number can be higher
     """
+    # create output folder
+    if base is None:
+        base = os.path.join(get_project_root(), f"trained_models/{run_name}/")
+    if not os.path.exists(base):
+        os.makedirs(base)
+
+    # set up logging file
+    logging.basicConfig(
+        filename=os.path.join(
+            get_project_root(), f"trained_models/{run_name}/training.log"
+        ),
+        # encoding="utf-8",
+        level=logging.DEBUG,
+    )
+    # save a copy of the train script
+    shutil.copy(
+        __file__,
+        os.path.join(get_project_root(), f"trained_models/{run_name}/train.py"),
+    )
+
     acc = Accuracy()
+    chunk_number = start_chunk
 
     for epoch in range(num_epochs):
         print(f"Epoch {epoch}")
@@ -90,39 +114,43 @@ def train_model(
                 chunk_loss = running_loss / (i + 1)
                 chunk_accuracy = running_accuracy / (i + 1)
 
-                print(
-                    "{} Loss: {:.4f}, Accuracy: {:.4f}, took {}".format(
-                        phase,
-                        chunk_loss,
-                        chunk_accuracy,
-                        time() - start_time_batch,
-                    )
+                phase_output = "{} Loss: {:.4f}, Accuracy: {:.4f}, took {}".format(
+                    phase,
+                    chunk_loss,
+                    chunk_accuracy,
+                    time() - start_time_batch,
                 )
+                print(phase_output)
+                logging.info(phase_output)
 
+            # save model
+            if chunk_number % save_every == 0:
+                torch.save(
+                    model.state_dict(),
+                    os.path.join(
+                        base,
+                        f"{name}_chunk{chunk_number+1}.ckpt",
+                    ),
+                )
+                print("model saved")
+                logging.info("model saved")
+            chunk_number += 1
+            scheduler.step()
+
+            # final outputs
             time_elapsed = time() - start_time_chunk
-            print(
+            s = (
                 "Chunk {}/{} FINISHED, took {:.0f}m {:.0f}s".format(
-                    start_chunk,
+                    chunk_number,
                     len(dataloader_ls),
                     time_elapsed // 60,
                     time_elapsed % 60,
                 )
+                + "\n"
+                + "-" * 10
             )
-            print("-" * 10)
-            if base is None:
-                base = os.path.join(get_project_root(), f"trained_models/run1/")
-            if not os.path.exists(base):
-                os.makedirs(base)
-            torch.save(
-                model.state_dict(),
-                os.path.join(
-                    base,
-                    f"{name}_chunk{start_chunk+1}.ckpt",
-                ),
-            )
-            print("model saved")
-            start_chunk += 1
-            scheduler.step()
+            print(s)
+            logging.info(s)
 
 
 if __name__ == "__main__":
@@ -143,15 +171,15 @@ if __name__ == "__main__":
 
     seed = np.random.randint(100000)
     train_data_chunks = TwemojiDataChunks(
-        "train_v2_min_2",
-        chunksize=64000,
+        "train_v2",
+        chunksize=128000,
         shuffle=True,
         batch_size=64,
         seed=seed,
         text_col="text_no_emojis",
     )
     valid_data = TwemojiData(
-        "valid_v2_min_2",
+        "valid_v2",
         shuffle=True,
         batch_size=64,
         limit=6400,
@@ -177,5 +205,7 @@ if __name__ == "__main__":
         num_epochs=1000,
         name="sembert",
         start_chunk=start_chunk,
-        base="/content/drive/MyDrive/cs224n_project/trained_models/sembert_cased_min2",
+        # base="/content/drive/MyDrive/cs224n_project/trained_models/sembert_cased_min2",
+        save_every=2,
+        run_name="main_run",
     )
