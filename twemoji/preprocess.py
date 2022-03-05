@@ -2,6 +2,17 @@ import os
 import pandas as pd
 from time import time
 import re
+import preprocessor
+import contractions
+import nltk
+from nltk import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+nltk.download
+nltk.download("wordnet")
+nltk.download("punkt")
+nltk.download("omw-1.4")
+
 
 from emoji import UNICODE_EMOJI
 
@@ -57,6 +68,38 @@ def extract_emojis(s):
     return ["".join(emojis), emoji_ids]
 
 
+def remove_extra_spaces(text):
+    """
+    Return :- string after removing extra whitespaces
+    Input :- String
+    Output :- String
+    """
+    space_pattern = r"\s+"
+    without_space = re.sub(pattern=space_pattern, repl=" ", string=text)
+    without_space = without_space.strip()
+    return without_space
+
+
+def lemmatization_wrapper(lemma):
+    def lemmatization(text):
+        """
+        Result :- string after stemming
+        Input :- String
+        Output :- String
+        """
+        # word tokenization
+        tokens = word_tokenize(text)
+
+        for index in range(len(tokens)):
+            # lemma word
+            lemma_word = lemma.lemmatize(tokens[index])
+            tokens[index] = lemma_word
+
+        return " ".join(tokens)
+
+    return lemmatization
+
+
 def preprocess(data):
     """
     Preprocessed the text data and returns a pandas dataframe.
@@ -69,14 +112,23 @@ def preprocess(data):
             - raw_text: raw text from raw data excluding tweet id and "\n" at the end
             - emojis: emojis that appear in the text. This is a string, no separation between emojis
             - emoji_ids: emoji_ids that correspond to emojis (if emojis are known to emoji_description)
-            - text_no_emojis: raw_text where emojis are removed
+            - text_no_emojis: raw_text where emojis are removed, white space is removed
+            - text_no_emojis_clean: removed mentions and links, white space is removed
+            - text_no_emojis_superclean: same as clean but with lemmatization and expansion of contractions
             - text_replaced_emojis: raw_text where emojis are replaced by " xxxxxxxx "
+
+        - df_filtered {pd.DataFrame}: same as df except filtered based on minimum
+                number of words per tweet in text_no_emojis_clean
+            - len_text: text length excluding mentions and links
 
     """
     split_data = [s.split(" ", maxsplit=1) for s in data]
     split_data = [list(i) for i in zip(*split_data)]
     ids = split_data[0]
-    raw_texts = [s.strip().lower() for s in split_data[1]]
+
+    # Preprocessing 1. remove white space front and back
+    raw_texts = [s.strip() for s in split_data[1]]  # modified
+
     emojis_emoji_ids = [extract_emojis(s) for s in raw_texts]
     emojis = [e[0] for e in emojis_emoji_ids]
     emoji_ids = [e[1] for e in emojis_emoji_ids]
@@ -84,12 +136,40 @@ def preprocess(data):
     df = pd.DataFrame(
         {"id": ids, "raw_text": raw_texts, "emojis": emojis, "emoji_ids": emoji_ids}
     )
+
+    ##1. Dataset with minimal data cleaning to compare with original results of the paper
     df["text_no_emojis"] = df.apply(
         lambda x: re.sub("|".join(list(x.emojis)), "", x.raw_text), axis=1
     )
-    # df["text_replaced_emojis"] = df.apply(
-    #     lambda x: re.sub("|".join(list(x.emojis)), " xxxxxxxx ", x.raw_text)), axis=1
-    # )
+    # Remove extra spaces
+    df.text_no_emojis = df.text_no_emojis.map(lambda a: remove_extra_spaces(a))
+
+    ##2a. Dataset with some preprocessing
+    # Remove mentions and links
+    df["text_no_emojis_clean"] = df.text_no_emojis.map(lambda a: preprocessor.clean(a))
+    # Remove "rt : " at the start of the sentence
+    df.text_no_emojis_clean = df.text_no_emojis_clean.where(
+        df.text_no_emojis_clean.str[:2] != ": ", df.text_no_emojis_clean.str[2:]
+    )
+    # Remove extra white space
+    df.text_no_emojis_clean = df.text_no_emojis_clean.map(
+        lambda a: remove_extra_spaces(a)
+    )
+
+    ## 3. Dataset with more preprocessing
+    # Expansion of Contractions
+    df["text_no_emojis_superclean"] = df.text_no_emojis_clean.map(
+        lambda a: contractions.fix(a)
+    )
+
+    # Lemmatization
+    lemmatization = lemmatization_wrapper(WordNetLemmatizer())
+    df.text_no_emojis_superclean = df.text_no_emojis_superclean.map(
+        lambda a: lemmatization(a)
+    )
+
+    # add number of words
+    df["n_words"] = df.text_no_emojis_clean.apply(lambda x: len(x.split(" ")))
 
     df.emojis = df.emojis.where(df.emojis != "")
     df.emoji_ids = df.emoji_ids.where(df.emoji_ids.apply(len) > 0)
@@ -134,9 +214,9 @@ def filter_data(df):
 # *************** finish filtering ***********************
 
 if __name__ == "__main__":
-    df_unfiltered_train = tocsv("raw_train.txt", "twemoji_train.csv")
-    df_unfiltered_valid = tocsv("raw_valid.txt", "twemoji_valid.csv")
-    df_unfiltered_test = tocsv("raw_test.txt", "twemoji_test.csv")
+    df_unfiltered_train = tocsv("raw_train.txt", "twemoji_train_v2.csv")
+    df_unfiltered_valid = tocsv("raw_valid.txt", "twemoji_valid_v2.csv")
+    df_unfiltered_test = tocsv("raw_test.txt", "twemoji_test_v2.csv")
 
     print("train NA\n", df_unfiltered_train.isna().sum())
     print("valid NA\n", df_unfiltered_valid.isna().sum())
@@ -154,10 +234,26 @@ if __name__ == "__main__":
     df_valid, df_valid_zero = filter_data(df_valid)
 
     outpath = os.path.join(get_project_root(), "twemoji/data")
-    df_train.to_csv(os.path.join(outpath, "twemoji_train.csv"), index=False)
-    df_valid.to_csv(os.path.join(outpath, "twemoji_valid.csv"), index=False)
-    df_test.to_csv(os.path.join(outpath, "twemoji_test.csv"), index=False)
-    pd.concat([df_train_zero, df_valid_zero]).to_csv(
-        os.path.join(outpath, "twemoji_extra_zero.csv"), index=False
+    df_train.to_csv(os.path.join(outpath, "twemoji_train_v2.csv"), index=False)
+    df_valid.to_csv(os.path.join(outpath, "twemoji_valid_v2.csv"), index=False)
+    df_test.to_csv(os.path.join(outpath, "twemoji_test_v2.csv"), index=False)
+    extra_zero_df = pd.concat([df_train_zero, df_valid_zero])
+    extra_zero_df.to_csv(
+        os.path.join(outpath, "twemoji_extra_zero_v2.csv"), index=False
     )
+
+    # min_num_words = 2
+    # df_train.loc[df_train.n_words > min_num_words].to_csv(
+    #     os.path.join(outpath, f"twemoji_train_v2_min_{min_num_words}.csv"), index=False
+    # )
+    # df_valid.loc[df_valid.n_words > min_num_words].to_csv(
+    #     os.path.join(outpath, f"twemoji_valid_v2_min_{min_num_words}.csv"), index=False
+    # )
+    # df_test.loc[df_test.n_words > min_num_words].to_csv(
+    #     os.path.join(outpath, f"twemoji_test_v2_min_{min_num_words}.csv"), index=False
+    # )
+    # extra_zero_df.loc[extra_zero_df.n_words > min_num_words].to_csv(
+    #     os.path.join(outpath, f"twemoji_extra_zero_v2_min_{min_num_words}.csv"),
+    #     index=False,
+    # )
     print("saved files")
