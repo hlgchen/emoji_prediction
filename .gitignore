@@ -14,3 +14,5 @@ twemoji/raw_data
 twemoji/unfiltered_processed
 twemoji/data
 *checkpoint*
+
+trained_models/*
