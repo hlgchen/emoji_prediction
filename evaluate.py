@@ -50,7 +50,7 @@ def print_samples(
     y_emojis = [[emoji_id_char[em] for em in row] for row in y]
 
     outputs = model(X, TEST_IDX)
-    top10_probas, top10_emoji_ids = torch.topk(outputs, 10, dim=-1)
+    _, top10_emoji_ids = torch.topk(outputs, 10, dim=-1)
     top10_predictions = [
         [emoji_id_char[em.item()] for em in row] for row in top10_emoji_ids
     ]
@@ -120,6 +120,11 @@ if __name__ == "__main__":
         ],
     )
     argp.add_argument(
+        "--run_name",
+        help="Whether to only include tweets with one single emoji",
+        default="main_run",
+    )
+    argp.add_argument(
         "--l1",
         help="Whether to only include tweets with one single emoji",
         default=False,
@@ -127,7 +132,7 @@ if __name__ == "__main__":
     argp.add_argument(
         "--function",
         help="Whether to print example predictions or to do full on evaluation",
-        choices=["evaluate", "samples"],
+        choices=["evaluate", "samples", "compare"],
         default="evaluate",
     )
     argp.add_argument(
@@ -147,6 +152,7 @@ if __name__ == "__main__":
 
     # load model
     model_name = args.model_name
+    run_name = args.run_name
     dataset_name = args.dataset_name
     l1 = bool(args.l1) if isinstance(args.l1, str) else args.l1
     function = args.function
@@ -156,7 +162,7 @@ if __name__ == "__main__":
     text_col = args.text_col
 
     pretrained_path = os.path.join(
-        get_project_root(), f"trained_models/run1/{model_name}.ckpt"
+        get_project_root(), f"trained_models/{run_name}/{model_name}.ckpt"
     )
     model = SimpleSembert()
     model = model.to(device)
@@ -194,3 +200,17 @@ if __name__ == "__main__":
         file_path = os.path.join(save_path, f"evaluation.txt")
         with open(file_path, "a+") as f:
             f.write(s)
+    elif function == "compare":
+        for k in [1, 5, 10, 100]:
+            total_accuracy = evaluate_on_dataset(model, dataset, k=k)
+
+            save_path = os.path.join(get_project_root(), f"evaluation")
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
+
+            s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows}\n restricted to 1 emoji {l1}"
+            s += f"Accuracy with top {k} prediction is {total_accuracy}\n\n"
+
+            file_path = os.path.join(save_path, f"evaluation.txt")
+            with open(file_path, "a+") as f:
+                f.write(s)
