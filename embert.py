@@ -11,6 +11,7 @@ from transformers import (
     AutoModel,
     AutoTokenizer,
 )
+from sentence_transformers import SentenceTransformer
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -145,6 +146,41 @@ class SimpleSembert(nn.Module):
         embeddings = mean_pooling(model_output, attention_mask)
         sentence_embeddings = F.normalize(embeddings, p=2, dim=1)
 
+        emoji_embeddings = self.emoji_embeddings[emoji_ids]
+
+        X_1 = sentence_embeddings.repeat_interleave(len(emoji_ids), dim=0)
+        X_2 = emoji_embeddings.repeat(len(sentence_ls), 1)
+
+        X_1 = self.linear1(X_1)
+        X_2 = self.linear2(X_2)
+
+        out = (X_1 * X_2).sum(dim=1).view(-1, len(emoji_ids))
+        out = F.softmax(out, dim=1)
+
+        return out
+
+
+class VerySimpleSembert(nn.Module):
+    def __init__(self):
+        super(VerySimpleSembert, self).__init__()
+        self.emoji_embeddings = nn.Parameter(
+            get_emoji_fixed_embedding(image=True, bert=True, wordvector=False),
+            requires_grad=False,
+        )
+        self.emoji_embedding_size = self.emoji_embeddings.size(1)
+
+        model_name = "all-distilroberta-v1"
+        self.model = SentenceTransformer(model_name)
+        for _, params in self.model.named_parameters():
+            params.requires_grad = False
+        self.sentence_embedding_size = 768
+
+        self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
+        self.linear2 = nn.Linear(self.emoji_embedding_size, 500)
+
+    def forward(self, sentence_ls, emoji_ids):
+
+        sentence_embeddings = self.model.encode(sentence_ls, normalize_embeddings=True)
         emoji_embeddings = self.emoji_embeddings[emoji_ids]
 
         X_1 = sentence_embeddings.repeat_interleave(len(emoji_ids), dim=0)
