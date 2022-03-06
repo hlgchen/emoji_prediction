@@ -121,7 +121,6 @@ class SimpleSembert(nn.Module):
             f"sentence-transformers/{model_name}"
         )
         self.model = AutoModel.from_pretrained(f"sentence-transformers/{model_name}")
-        # self.sentence_embedding_size = 384
         self.sentence_embedding_size = 768
 
         self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
@@ -168,43 +167,46 @@ def get_emoji_descriptions():
     s = df.emjpd_emoji_name_og.fillna("") + filler
     s += df.emjpd_aliases.fillna("") + filler
     s += df.emjpd_description_main.fillna("") + filler
-    s += df.emjpd_usage_info.fillna("") + filler
     s_ls = s.tolist()
-    return np.array(s_ls)
+    return s_ls
 
 
-class Embert(nn.Module):
+class Sembert(nn.Module):
     def __init__(self, mode="avg"):
-        super(Embert, self).__init__()
+        super(Sembert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=True, bert=False, wordvector=False),
             requires_grad=False,
         )
 
-        base_model_name = "distilbert-base-uncased"
-        self.tokenizer = DistilBertTokenizer.from_pretrained(base_model_name)
-        self.emoji_bert = DistilBertModel.from_pretrained(base_model_name)
-        for name, param in self.emoji_bert.named_parameters():
-            if "5" not in name:
-                param.requires_grad = False
-
-        self.model = DistilBertModel.from_pretrained(base_model_name)
-        self.mode = mode if mode in ["avg", "last"] else "avg"
-
-        self.sentence_embedding_size = BertConfig.from_pretrained(
-            base_model_name
-        ).hidden_size
-        self.emoji_embedding_size = (
-            self.emoji_embeddings.size(1) + self.sentence_embedding_size
+        sentence_model_name = "all-distilroberta-v1"
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            f"sentence-transformers/{sentence_model_name}"
         )
+        self.model = AutoModel.from_pretrained(
+            f"sentence-transformers/{sentence_model_name}"
+        )
+        self.sentence_embedding_size = 768
+
+        description_model_name = "all-MiniLM-L6-v2"
+        self.description_tokenizer = AutoTokenizer.from_pretrained(
+            f"sentence-transformers/{description_model_name}"
+        )
+        self.description_model = AutoModel.from_pretrained(
+            f"sentence-transformers/{description_model_name}"
+        )
+        self.description_embedding_size = 384
 
         descriptions = get_emoji_descriptions().tolist()
-        self.dtoken = self.tokenizer(
+        self.dtoken = self.description_tokenizer(
             descriptions, return_tensors="pt", truncation=True, padding=True
         )
 
-        self.linear1 = nn.Linear(self.sentence_embedding_size, 200)
-        self.linear2 = nn.Linear(self.emoji_embedding_size, 200)
+        self.emoji_embedding_size = (
+            self.emoji_embeddings.size(1) + self.description_embedding_size
+        )
+        self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
+        self.linear2 = nn.Linear(self.emoji_embedding_size, 500)
 
     def partial_forward(self, sentence_ls, model, batch_size):
         if isinstance(sentence_ls, list):
@@ -226,16 +228,9 @@ class Embert(nn.Module):
             model_output_ls.append(temp)
         text_model_output = torch.cat(model_output_ls, dim=0)
 
-        sentence_embedding_ls = []
-        if self.mode == "avg":
-            for i, l in enumerate(encoded_input.attention_mask.sum(dim=1).tolist()):
-                sentence_embedding_ls.append(text_model_output[i, :l].mean(dim=0))
-        else:
-            for i, l in enumerate(encoded_input.attention_mask.sum(dim=1).tolist()):
-                sentence_embedding_ls.append(text_model_output[i, l - 1])
-
-        sentences_embeddings = torch.stack(sentence_embedding_ls)
-        return sentences_embeddings
+        embeddings = mean_pooling(text_model_output, encoded_input["attention_mask"])
+        sentence_embeddings = F.normalize(embeddings, p=2, dim=1)
+        return sentence_embeddings
 
     def forward(self, sentence_ls, emoji_ids):
         batch_size = len(sentence_ls)
@@ -251,7 +246,7 @@ class Embert(nn.Module):
             "attention_mask": dtoken_attention_mask,
         }
         description_embeddings = self.partial_forward(
-            description_tokens, self.emoji_bert, batch_size
+            description_tokens, self.description_model, batch_size
         )
         img_embedding = self.emoji_embeddings[emoji_ids]
         emoji_embeddings = torch.cat(img_embedding, description_embeddings, dim=1)
