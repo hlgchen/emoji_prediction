@@ -50,7 +50,7 @@ def print_samples(
     y_emojis = [[emoji_id_char[em] for em in row] for row in y]
 
     outputs = model(X, TEST_IDX)
-    _, top10_emoji_ids = torch.topk(outputs, 10, dim=-1)
+    top10_probas, top10_emoji_ids = torch.topk(outputs, 10, dim=-1)
     top10_predictions = [
         [emoji_id_char[em.item()] for em in row] for row in top10_emoji_ids
     ]
@@ -60,7 +60,7 @@ def print_samples(
     print(score)
     for i, sentence in enumerate(X):
         print(
-            f"sentence:\n {sentence}:\n actual emojis: {y_emojis[i]}\n predicted top 10: {top10_predictions[i]}\n\n"
+            f"sentence:\n {sentence}:\n actual emojis: {y_emojis[i]}\n predicted top 10: {top10_predictions[i]} \n predicted_probas: {top10_probas[i]}\n\n"
         )
         print("*" * 20)
 
@@ -186,6 +186,15 @@ if __name__ == "__main__":
 
     # make calcualtions
     if function == "samples":
+        prevalence = pd.read_csv(
+            os.path.join(get_project_root(), "twemoji/data/twemoji_prevalence.csv")
+        )
+        prevalence["faktor"] = np.log(
+            prevalence.prevalence / prevalence.prevalence.mean()
+        )
+        model.normalize = prevalence.apply(
+            lambda x: (int(x.emoji_ids), x.faktor), axis=1
+        ).tolist()
         print_samples(
             model, dataset, n_samples=n_samples, seed=np.random.randint(0, 200000)
         )

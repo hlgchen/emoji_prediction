@@ -111,7 +111,7 @@ class SimpleEmbert(nn.Module):
 
 
 class SimpleSembert(nn.Module):
-    def __init__(self):
+    def __init__(self, normalize_ls=None):
         super(SimpleSembert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=True, bert=True, wordvector=False),
@@ -128,6 +128,8 @@ class SimpleSembert(nn.Module):
 
         self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
         self.linear2 = nn.Linear(self.emoji_embedding_size, 500)
+
+        self.normalize = normalize_ls
 
     def forward(self, sentence_ls, emoji_ids):
 
@@ -155,6 +157,12 @@ class SimpleSembert(nn.Module):
 
         out = (X_1 * X_2).sum(dim=1).view(-1, len(emoji_ids))
         out = F.softmax(out, dim=1)
+
+        if self.normalize is not None:
+            normalize = torch.ones((1, out.shape[1]))
+            for i, f in self.normalize:
+                normalize[0, i] = f
+            out = out / normalize
 
         return out
 
