@@ -42,9 +42,12 @@ def get_emoji_fixed_embedding(image=True, bert=True, wordvector=False):
 
 
 def mean_pooling(model_output, attention_mask):
-    token_embeddings = model_output[
-        0
-    ]  # First element of model_output contains all token embeddings
+    if not isinstance(model_output, torch.Tensor):
+        token_embeddings = model_output[
+            0
+        ]  # First element of model_output contains all token embeddings
+    else:
+        token_embeddings = model_output
     input_mask_expanded = (
         attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
     )
@@ -197,7 +200,7 @@ class Sembert(nn.Module):
         )
         self.description_embedding_size = 384
 
-        descriptions = get_emoji_descriptions().tolist()
+        descriptions = get_emoji_descriptions()
         self.dtoken = self.description_tokenizer(
             descriptions, return_tensors="pt", truncation=True, padding=True
         )
@@ -222,10 +225,8 @@ class Sembert(nn.Module):
         )
         model_output_ls = []
         for input_ids, attention_mask in zip(input_id_ls, attention_mask_ls):
-            temp = model(
-                input_ids=input_ids, attention_mask=attention_mask
-            ).last_hidden_state
-            model_output_ls.append(temp)
+            temp = model(input_ids=input_ids, attention_mask=attention_mask)
+            model_output_ls.append(temp[0])
         text_model_output = torch.cat(model_output_ls, dim=0)
 
         embeddings = mean_pooling(text_model_output, encoded_input["attention_mask"])
@@ -249,7 +250,7 @@ class Sembert(nn.Module):
             description_tokens, self.description_model, batch_size
         )
         img_embedding = self.emoji_embeddings[emoji_ids]
-        emoji_embeddings = torch.cat(img_embedding, description_embeddings, dim=1)
+        emoji_embeddings = torch.cat([img_embedding, description_embeddings], dim=1)
 
         # combine the two
         X_1 = sentences_embeddings.repeat_interleave(len(emoji_ids), dim=0)
