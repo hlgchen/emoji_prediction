@@ -9,12 +9,12 @@ elif [ "$1" = "main" ]; then
 elif [ "$1" = "sembert" ]; then
 	python emoji_embedding/train_sembert.py
 elif [ "$1" = "compare" ]; then
-	python evaluate.py sembert_chunk47 "valid_v2" --text_col "text_no_emojis" --run_name main_run --function compare
-	python evaluate.py sembert_chunk47 "valid_v2_min_2" --text_col "text_no_emojis" --run_name main_run --function compare
-	python evaluate.py sembert_chunk47 "test_v2" --text_col "text_no_emojis" --run_name main_run --function compare
-	python evaluate.py sembert_chunk47 "test_v2_min_2" --text_col "text_no_emojis" --run_name main_run --function compare
-	python evaluate.py sembert_chunk47 "extra_zero_v2" --text_col "text_no_emojis" --run_name main_run --function compare
-	python evaluate.py sembert_chunk47 "extra_zero_v2_min_2" --text_col "text_no_emojis" --run_name main_run --function compare
+	python evaluate.py sembert_chunk51 "valid_v2" --text_col "text_no_emojis" --run_name main_run --function compare
+	python evaluate.py sembert_chunk51 "valid_v2_min_2" --text_col "text_no_emojis" --run_name main_run --function compare
+	python evaluate.py sembert_chunk51 "test_v2" --text_col "text_no_emojis" --run_name main_run --function compare
+	python evaluate.py sembert_chunk51 "test_v2_min_2" --text_col "text_no_emojis" --run_name main_run --function compare
+	python evaluate.py sembert_chunk51 "extra_zero_v2" --text_col "text_no_emojis" --run_name main_run --function compare
+	python evaluate.py sembert_chunk51 "extra_zero_v2_min_2" --text_col "text_no_emojis" --run_name main_run --function compare
 elif [ "$1" = "evaluate" ]; then
 	# sembert base on v2 of data (cased)
 	python evaluate.py sembert_chunk14 "valid_v2" --k 1 --text_col "text_no_emojis" --run_name run1

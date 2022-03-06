@@ -99,6 +99,7 @@ if __name__ == "__main__":
             "sembert_cased_min3_clean_chunk30",
             "sembert_cased_min3_chunk27",
             "sembert_cased_chunk26",
+            "sembert_chunk51",
         ],
     )
     argp.add_argument(
@@ -138,7 +139,7 @@ if __name__ == "__main__":
     argp.add_argument(
         "--nrows",
         help="Number of rows to load from the dataset",
-        default=200000,
+        default=None,
     )
     argp.add_argument(
         "--k", help="K to specify top k prediction in evaluate", default=1
