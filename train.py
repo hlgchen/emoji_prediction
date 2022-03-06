@@ -57,16 +57,14 @@ def train_model(
 
     # set up logging file
     logging.basicConfig(
-        filename=os.path.join(
-            get_project_root(), f"trained_models/{run_name}/training.log"
-        ),
+        filename=os.path.join(base, f"training.log"),
         # encoding="utf-8",
         level=logging.DEBUG,
     )
     # save a copy of the train script
     shutil.copy(
         __file__,
-        os.path.join(get_project_root(), f"trained_models/{run_name}/train.py"),
+        os.path.join(base, f"train.py"),
     )
 
     acc = Accuracy()

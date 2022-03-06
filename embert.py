@@ -180,7 +180,9 @@ class VerySimpleSembert(nn.Module):
 
     def forward(self, sentence_ls, emoji_ids):
 
-        sentence_embeddings = self.model.encode(sentence_ls, normalize_embeddings=True)
+        sentence_embeddings = self.model.encode(
+            sentence_ls, normalize_embeddings=True, convert_to_tensor=True
+        )
         emoji_embeddings = self.emoji_embeddings[emoji_ids]
 
         X_1 = sentence_embeddings.repeat_interleave(len(emoji_ids), dim=0)
