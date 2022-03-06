@@ -116,7 +116,6 @@ class SimpleSembert(nn.Module):
         )
         self.emoji_embedding_size = self.emoji_embeddings.size(1)
 
-        # model_name = "all-MiniLM-L12-v2"
         model_name = "all-distilroberta-v1"
         self.tokenizer = AutoTokenizer.from_pretrained(
             f"sentence-transformers/{model_name}"
@@ -281,9 +280,6 @@ class EmbertLoss(nn.Module):
             correct_average_p = torch.sum(torch.log(probas[i][mask]))
             wrong_average_p = torch.sum(torch.log(1 - probas[i][~mask]))
             loss += (1 / len(labels)) * -(wrong_average_p + correct_average_p)
-            # print(
-            #     f"correct_average_p: {correct_average_p:.4f} wrong_average_p: {wrong_average_p:.4f} loss: {loss:.4f} \n"
-            # )
         return loss
 
 
@@ -297,9 +293,6 @@ class Accuracy(nn.Module):
             y = set(labels[i])
             predicted_emojis = torch.topk(probas[i], len(y))[1]
             predicted_emojis = set(predicted_emojis.tolist())
-            # print(
-            #     f"predicted emojis: {torch.topk(probas[i], 5)[1]} actual: {y} predicted probas {torch.topk(probas[i], 5)[0]} \n"
-            # )
             accuracy += (1 / len(labels)) * (
                 len(predicted_emojis.intersection(y)) / len(y)
             )
