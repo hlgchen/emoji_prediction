@@ -65,27 +65,26 @@ def print_samples(
         print("*" * 20)
 
 
-def evaluate_on_dataset(model, data, k=1):
-    accuracy = 0
+def evaluate_on_dataset(model, data, k_ls=["1", "5", "10", "100"]):
+    accuracy_dict = {k: 0 for k in k_ls}
+    score_dict = {k: TopKAccuracy(int(k)) for k in k_ls}
     counter = 0
-    score = TopKAccuracy(k)
     with tqdm(enumerate(data)) as tbatch:
         for i, batch in tbatch:
             X = batch[0]
             y = batch[1]
             outputs = model(X, TEST_IDX)
-            batch_accuracy = score(outputs, y)
-            accuracy += len(X) * batch_accuracy
+            batch_accuracy = {k: score_dict[k](outputs, y) for k in k_ls}
+            accuracy_dict = {
+                k: accuracy_dict[k] + len(X) * v for k, v in batch_accuracy.items()
+            }
             counter += len(X)
+            running_accuracies = {k: v / counter for k, v in accuracy_dict.items()}
 
-            tbatch.set_postfix(
-                batch_accuracy=batch_accuracy,
-                running_accuracy=accuracy / counter,
-            )
+            tbatch.set_postfix(**running_accuracies)
 
-    total_accuracy = accuracy / counter
-    print(f"total accuracy is {total_accuracy}")
-    return total_accuracy
+    print(f"total accuracies are {running_accuracies}")
+    return running_accuracies
 
 
 if __name__ == "__main__":
@@ -196,23 +195,24 @@ if __name__ == "__main__":
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
-        s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows}\n restricted to 1 emoji {l1}"
-        s += f"Accuracy with top {k} prediction is {total_accuracy}\n\n"
+        s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows},  restricted to 1 emoji {l1}\n"
+        s += f"Accuracy is {total_accuracy}\n\n"
 
         file_path = os.path.join(save_path, f"evaluation.txt")
         with open(file_path, "a+") as f:
             f.write(s)
     elif function == "compare":
-        for k in [1, 5, 10, 100]:
-            total_accuracy = evaluate_on_dataset(model, dataset, k=k)
+        total_accuracy = evaluate_on_dataset(
+            model, dataset, k_ls=["1", "5", "10", "100"]
+        )
 
-            save_path = os.path.join(get_project_root(), f"evaluation")
-            if not os.path.exists(save_path):
-                os.makedirs(save_path)
+        save_path = os.path.join(get_project_root(), f"evaluation")
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
 
-            s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows}\n restricted to 1 emoji {l1}"
-            s += f"Accuracy with top {k} prediction is {total_accuracy}\n\n"
+        s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows}, restricted to 1 emoji {l1}\n"
+        s += f"Accuracy is {total_accuracy}\n\n"
 
-            file_path = os.path.join(save_path, f"evaluation.txt")
-            with open(file_path, "a+") as f:
-                f.write(s)
+        file_path = os.path.join(save_path, f"evaluation.txt")
+        with open(file_path, "a+") as f:
+            f.write(s)
