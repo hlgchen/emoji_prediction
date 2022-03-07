@@ -93,13 +93,6 @@ if __name__ == "__main__":
     argp.add_argument(
         "model_name",
         help="Which model to use for evaluation",
-        choices=[
-            "sembert_chunk14",
-            "sembert_cased_min3_clean_chunk30",
-            "sembert_cased_min3_chunk27",
-            "sembert_cased_chunk26",
-            "sembert_chunk51",
-        ],
     )
     argp.add_argument(
         "dataset_name",
