@@ -257,10 +257,11 @@ class Sembert(nn.Module):
         else:
             encoded_input = sentence_ls
 
-        input_id_ls = torch.split(encoded_input["input_ids"].to(device), batch_size)
-        attention_mask_ls = torch.split(
-            encoded_input["attention_mask"].to(device), batch_size
-        )
+        encoded_input["input_ids"] = encoded_input["input_ids"].to(device)
+        encoded_input["attention_mask"] = encoded_input["attention_mask"].to(device)
+
+        input_id_ls = torch.split(encoded_input["input_ids"], batch_size)
+        attention_mask_ls = torch.split(encoded_input["attention_mask"], batch_size)
         model_output_ls = []
         for input_ids, attention_mask in zip(input_id_ls, attention_mask_ls):
             temp = model(input_ids=input_ids, attention_mask=attention_mask)
