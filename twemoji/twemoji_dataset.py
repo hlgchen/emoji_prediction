@@ -145,8 +145,7 @@ class TwemojiBalancedData:
         self.length_df = len(self.df)
         self.df["idx"] = self.df.emoji_ids
         self.df = self.df.explode(column="idx")
-        self.df.index = self.df.idx
-        self.all_emojis = self.df.idx.unique()
+        self.gdf = self.df.groupby(by="idx")
 
         self.batch_size = batch_size
         self.limit = limit
@@ -159,13 +158,9 @@ class TwemojiBalancedData:
             else self.length_df
         )
         for _ in range(0, limit, self.batch_size):
-            text = []
-            labels = []
-            for emoji in np.random.choice(self.all_emojis, self.batch_size):
-                sample = self.df.loc[[emoji]].sample()
-                text.append(sample[self.text_col].iloc[0])
-                labels.append(sample.emoji_ids.iloc[0])
-            yield text, labels
+            samples = self.gdf.sample()
+            sample = samples.sample(self.batch_size)
+            yield sample[self.text_col].tolist(), sample.emoji_ids.tolist()
 
     def __len__(self):
         return self.length_df
