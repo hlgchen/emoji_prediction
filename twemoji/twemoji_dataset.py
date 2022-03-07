@@ -28,7 +28,7 @@ class TwemojiData:
                 twemoji_path, usecols=[text_col, "emoji_ids"], nrows=nrows
             )
         else:
-            self.df = data
+            self.df = data.copy()
         self.df.emoji_ids = (
             self.df.emoji_ids.str[1:-1]
             .str.split(",")
@@ -73,6 +73,7 @@ class TwemojiDataChunks:
         batch_size=64,
         text_col="text_no_emojis",
         seed=1,
+        balanced=False,
     ):
         print(f"random seed is: {seed}")
         np.random.seed(seed)
@@ -94,6 +95,12 @@ class TwemojiDataChunks:
                 batch_size=batch_size,
                 text_col=text_col,
             )
+            if not balanced
+            else TwemojiBalancedData(
+                df,
+                batch_size=batch_size,
+                text_col=text_col,
+            )
             for df in df_ls
         ]
         self.n_chunks = len(self.data_ls)
@@ -107,3 +114,66 @@ class TwemojiDataChunks:
 
     def __len__(self):
         return self.n_chunks
+
+
+class TwemojiBalancedData:
+    def __init__(
+        self,
+        data,
+        nrows=None,
+        batch_size=64,
+        limit=None,
+        text_col="text_no_emojis",
+        seed=1,
+    ):
+        np.random.seed(seed)
+        if isinstance(data, str):
+            twemoji_path = os.path.join(
+                get_project_root(), f"twemoji/data/twemoji_{data}.csv"
+            )
+            self.df = pd.read_csv(
+                twemoji_path, usecols=[text_col, "emoji_ids"], nrows=nrows
+            )
+        else:
+            self.df = data.copy()
+        self.df.emoji_ids = (
+            self.df.emoji_ids.str[1:-1]
+            .str.split(",")
+            .apply(lambda x: [int(y) for y in x])
+            .tolist()
+        )
+        self.length_df = len(self.df)
+        self.df["idx"] = self.df.emoji_ids
+        self.df = self.df.explode(column="idx")
+        self.df.index = self.df.idx
+        self.all_emojis = self.df.idx.unique()
+
+        self.batch_size = batch_size
+        self.limit = limit
+        self.text_col = text_col
+
+    def __iter__(self):
+        limit = (
+            min(self.length_df, self.limit)
+            if self.limit is not None
+            else self.length_df
+        )
+        for _ in range(0, limit, self.batch_size):
+            text = []
+            labels = []
+            for emoji in np.random.choice(self.all_emojis, self.batch_size):
+                sample = self.df.loc[[emoji]].sample()
+                text.append(sample[self.text_col].iloc[0])
+                labels.append(sample.emoji_ids.iloc[0])
+            yield text, labels
+
+    def __len__(self):
+        return self.length_df
+
+
+if __name__ == "__main__":
+    data = TwemojiBalancedData("valid_v2")
+
+    for batch in data:
+        b = batch
+        break
