@@ -112,7 +112,7 @@ class SimpleEmbert(nn.Module):
 
 
 class SimpleSembert(nn.Module):
-    def __init__(self):
+    def __init__(self, dropout=None):
         super(SimpleSembert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=True, bert=True, wordvector=False),
@@ -129,6 +129,8 @@ class SimpleSembert(nn.Module):
 
         self.linear1 = nn.Linear(self.sentence_embedding_size, 500)
         self.linear2 = nn.Linear(self.emoji_embedding_size, 500)
+        if isinstance(dropout, float):
+            self.dropout = nn.Dropout(dropout)
 
     def forward(self, sentence_ls, emoji_ids):
 
@@ -150,6 +152,10 @@ class SimpleSembert(nn.Module):
 
         X_1 = sentence_embeddings.repeat_interleave(len(emoji_ids), dim=0)
         X_2 = emoji_embeddings.repeat(len(sentence_ls), 1)
+
+        if hasattr(self, "dropout"):
+            X_1 = self.dropout(X_1)
+            X_2 = self.dropout(X_2)
 
         X_1 = self.linear1(X_1)
         X_2 = self.linear2(X_2)
@@ -213,7 +219,7 @@ def get_emoji_descriptions():
 
 
 class Sembert(nn.Module):
-    def __init__(self, mode="avg"):
+    def __init__(self):
         super(Sembert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=True, bert=False, wordvector=False),
