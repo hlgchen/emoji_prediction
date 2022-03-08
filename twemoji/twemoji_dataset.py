@@ -29,12 +29,13 @@ class TwemojiData:
             )
         else:
             self.df = data.copy()
-        self.df.emoji_ids = (
-            self.df.emoji_ids.str[1:-1]
-            .str.split(",")
-            .apply(lambda x: [int(y) for y in x])
-            .tolist()
-        )
+        if isinstance(self.df.emoji_ids.iloc[0], str):
+            self.df.emoji_ids = (
+                self.df.emoji_ids.str[1:-1]
+                .str.split(",")
+                .apply(lambda x: [int(y) for y in x])
+                .tolist()
+            )
         self.shuffle = shuffle
         self.batch_size = batch_size
         self.limit = limit
@@ -86,6 +87,12 @@ class TwemojiDataChunks:
         )
         if shuffle:
             df = df.sample(frac=1).reset_index(drop=True)
+        df.emoji_ids = (
+            df.emoji_ids.str[1:-1]
+            .str.split(",")
+            .apply(lambda x: [int(y) for y in x])
+            .tolist()
+        )
 
         df_ls = [df[i : i + chunksize] for i in range(0, len(df), chunksize)]
         if not balanced:
@@ -150,12 +157,14 @@ class TwemojiBalancedData:
             )
         else:
             self.df = data.copy()
-        self.df.emoji_ids = (
-            self.df.emoji_ids.str[1:-1]
-            .str.split(",")
-            .apply(lambda x: [int(y) for y in x])
-            .tolist()
-        )
+
+        if isinstance(self.df.emoji_ids.iloc[0], str):
+            self.df.emoji_ids = (
+                self.df.emoji_ids.str[1:-1]
+                .str.split(",")
+                .apply(lambda x: [int(y) for y in x])
+                .tolist()
+            )
         self.df["idx"] = self.df.emoji_ids
         self.edf = self.df.explode(column="idx")
         if balance_df is not None:
