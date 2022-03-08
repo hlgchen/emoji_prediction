@@ -97,21 +97,6 @@ if __name__ == "__main__":
     argp.add_argument(
         "dataset_name",
         help="Which dataset to do evaluation on",
-        choices=[
-            "train",
-            "train_v2",
-            "train_v2_min_2",
-            "valid",
-            "valid_v2",
-            "valid_v2_min_2",
-            "test",
-            "test_v2",
-            "test_v2_min_2",
-            "extra_zero",
-            "extra_zero_v2",
-            "extra_zero_v2_min_2",
-            "balanced_test_v2",
-        ],
     )
     argp.add_argument(
         "--run_name",
