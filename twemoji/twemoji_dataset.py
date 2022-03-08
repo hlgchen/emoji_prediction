@@ -88,21 +88,33 @@ class TwemojiDataChunks:
             df = df.sample(frac=1).reset_index(drop=True)
 
         df_ls = [df[i : i + chunksize] for i in range(0, len(df), chunksize)]
-        self.data_ls = [
-            TwemojiData(
-                df,
-                shuffle=shuffle,
-                batch_size=batch_size,
-                text_col=text_col,
-            )
-            if not balanced
-            else TwemojiBalancedData(
-                df,
-                batch_size=batch_size,
-                text_col=text_col,
-            )
-            for df in df_ls
-        ]
+        if not balanced:
+            self.data_ls = [
+                TwemojiData(
+                    df,
+                    shuffle=shuffle,
+                    batch_size=batch_size,
+                    text_col=text_col,
+                )
+                for df in df_ls
+            ]
+        else:
+            edf = df.copy()
+            edf["idx"] = edf.emoji_ids
+            edf = edf.explode(column="idx")
+            c = edf.idx.value_counts()
+            c = c[c < 2000]
+            balance_df = edf.loc[edf.idx.isin(c.index)]
+            balance_df = balance_df.set_index("idx")
+            self.data_ls = [
+                TwemojiBalancedData(
+                    df,
+                    balance_df=balance_df,
+                    batch_size=batch_size,
+                    text_col=text_col,
+                )
+                for df in df_ls
+            ]
         self.n_chunks = len(self.data_ls)
 
     def __iter__(self):
@@ -120,6 +132,8 @@ class TwemojiBalancedData:
     def __init__(
         self,
         data,
+        balance_df=None,
+        n_balance_sample=8,
         nrows=None,
         batch_size=64,
         limit=None,
@@ -145,10 +159,14 @@ class TwemojiBalancedData:
         )
         self.df["idx"] = self.df.emoji_ids
         self.edf = self.df.explode(column="idx")
-        self.unique_emojis = self.edf["idx"].unique()
         self.edf = self.edf.set_index("idx")
+        if balance_df is not None:
+            self.edf = pd.concat([self.edf, balance_df])
+
+        self.unique_emojis = self.edf.index.unique()
 
         self.batch_size = batch_size
+        self.n_balance_sample = n_balance_sample
         self.limit = limit
         self.text_col = text_col
         self.shuffle = shuffle
@@ -162,15 +180,16 @@ class TwemojiBalancedData:
         if self.shuffle:
             self.df = self.df.sample(frac=1)
         text, labels = self.get_lists()
+        print("unique emojis: ", len(self.unique_emojis))
 
         limit = (
             min(len(self.df), self.limit) if self.limit is not None else len(self.df)
         )
-        batch_size_half = self.batch_size // 2
-        for start in range(0, limit, batch_size_half):
-            end = min(start + batch_size_half, limit)
+        normal_batch_size = self.batch_size - self.n_balance_sample
+        for start in range(0, limit, normal_batch_size):
+            end = min(start + normal_batch_size, limit)
 
-            sample_emojis = np.random.choice(self.unique_emojis, batch_size_half)
+            sample_emojis = np.random.choice(self.unique_emojis, self.n_balance_sample)
             sample = self.edf.loc[sample_emojis].groupby(by="idx").sample()
 
             batch_text = sample[self.text_col].tolist() + text[start:end]
