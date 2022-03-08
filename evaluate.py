@@ -1,6 +1,7 @@
 import os
 from pprint import pprint
 import numpy as np
+import pandas as pd
 import torch
 import pandas as pd
 from tqdm import tqdm
@@ -12,13 +13,22 @@ import argparse
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-TRAIN_IDX = list(range(1711))
-TEST_IDX = list(range(1810))
-
 
 def get_project_root():
     """Returns absolute path of project root."""
     return os.path.dirname(os.path.abspath(__file__))
+
+
+TRAIN_IDX = list(range(1711))
+TEST_IDX = list(range(1810))
+prevalance_path = os.path.join(
+    get_project_root(), "twemoji/data/twemoji_prevalence.csv"
+)
+TOP_EMOJIS = (
+    pd.read_csv(prevalance_path)
+    .sort_values(by="prevalence", ascending=False)
+    .emoji_ids.tolist()
+)
 
 
 def get_emoji_id_to_char():
@@ -34,13 +44,26 @@ def get_emoji_id_to_char():
     return emoji_id_char
 
 
+def get_outputs(model, X, restriction_type=None):
+    outputs = model(X, TEST_IDX)
+    if restriction_type is not None:
+        if restriction_type > 0:
+            excluded_emojis = TOP_EMOJIS[:restriction_type]
+        else:
+            excluded_emojis = TRAIN_IDX
+        mask_idx = [int(i not in excluded_emojis) for i in TEST_IDX]
+        mask_idx = torch.tensor([mask_idx for _ in range(len(X))])
+        outputs = outputs * mask_idx
+    return outputs
+
+
 def print_samples(
     model,
     data,
     n_samples=32,
-    seed=5,
+    seed=None,
+    restricted_type=None,
 ):
-
     emoji_id_char = get_emoji_id_to_char()
     seed = np.random.seed(seed)
     i = np.random.randint(0, len(data) - n_samples)
@@ -49,7 +72,7 @@ def print_samples(
     y = data[i : i + n_samples][1]
     y_emojis = [[emoji_id_char[em] for em in row] for row in y]
 
-    outputs = model(X, TEST_IDX)
+    outputs = get_outputs(model, X, restricted_type)
     _, top10_emoji_ids = torch.topk(outputs, 10, dim=-1)
     top10_predictions = [
         [emoji_id_char[em.item()] for em in row] for row in top10_emoji_ids
@@ -65,15 +88,20 @@ def print_samples(
         print("*" * 20)
 
 
-def evaluate_on_dataset(model, data, k_ls=["1", "5", "10", "100"]):
+def evaluate_on_dataset(
+    model,
+    data,
+    k_ls=["1", "5", "10", "100"],
+    restricted_type=None,
+):
     accuracy_dict = {k: 0 for k in k_ls}
     score_dict = {k: TopKAccuracy(int(k)) for k in k_ls}
     counter = 0
     with tqdm(enumerate(data)) as tbatch:
-        for i, batch in tbatch:
+        for _, batch in tbatch:
             X = batch[0]
             y = batch[1]
-            outputs = model(X, TEST_IDX)
+            outputs = get_outputs(model, X, restricted_type)
             batch_accuracy = {k: score_dict[k](outputs, y) for k in k_ls}
             accuracy_dict = {
                 k: accuracy_dict[k] + len(X) * v for k, v in batch_accuracy.items()
@@ -111,8 +139,8 @@ if __name__ == "__main__":
     argp.add_argument(
         "--function",
         help="Whether to print example predictions or to do full on evaluation",
-        choices=["evaluate", "samples", "compare"],
-        default="evaluate",
+        choices=["samples", "compare"],
+        default="compare",
     )
     argp.add_argument(
         "--nrows",
@@ -120,10 +148,12 @@ if __name__ == "__main__":
         default=None,
     )
     argp.add_argument(
-        "--k", help="K to specify top k prediction in evaluate", default=1
+        "--text_col", help="Column to use for evaluation", default="text_no_emojis"
     )
     argp.add_argument(
-        "--text_col", help="Column to use for evaluation", default="text_no_emojis"
+        "--r",
+        help="can be integer, specifies number of top emojis to disregard for evaluation. If -1 all training emojis are ignored.",
+        default=None,
     )
     argp.add_argument("--n_samples", help="n samples for samples function", default=32)
     argp.add_argument("--outputs_path", default=None)
@@ -136,9 +166,9 @@ if __name__ == "__main__":
     l1 = bool(args.l1) if isinstance(args.l1, str) else args.l1
     function = args.function
     nrows = int(args.nrows) if args.nrows is not None else args.nrows
-    k = int(args.k)
     n_samples = int(args.n_samples)
     text_col = args.text_col
+    restricted_type = int(args.r) if args.r is not None else args.r
 
     pretrained_path = os.path.join(
         get_project_root(), f"trained_models/{run_name}/{model_name}.ckpt"
@@ -164,24 +194,18 @@ if __name__ == "__main__":
     # make calcualtions
     if function == "samples":
         print_samples(
-            model, dataset, n_samples=n_samples, seed=np.random.randint(0, 200000)
+            model,
+            dataset,
+            n_samples=n_samples,
+            seed=None,
+            restricted_type=restricted_type,
         )
-    elif function == "evaluate":
-        total_accuracy = evaluate_on_dataset(model, dataset, k=k)
-
-        save_path = os.path.join(get_project_root(), f"evaluation")
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
-
-        s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows},  restricted to 1 emoji {l1}\n"
-        s += f"Accuracy is {total_accuracy}\n\n"
-
-        file_path = os.path.join(save_path, f"evaluation.txt")
-        with open(file_path, "a+") as f:
-            f.write(s)
     elif function == "compare":
         total_accuracy = evaluate_on_dataset(
-            model, dataset, k_ls=["1", "5", "10", "100"]
+            model,
+            dataset,
+            k_ls=["1", "5", "10", "100"],
+            restricted_type=restricted_type,
         )
 
         save_path = os.path.join(get_project_root(), f"evaluation")
