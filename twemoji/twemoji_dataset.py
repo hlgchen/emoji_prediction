@@ -124,6 +124,7 @@ class TwemojiBalancedData:
         batch_size=64,
         limit=None,
         text_col="text_no_emojis",
+        shuffle=True,
         seed=1,
     ):
         np.random.seed(seed)
@@ -142,28 +143,43 @@ class TwemojiBalancedData:
             .apply(lambda x: [int(y) for y in x])
             .tolist()
         )
-        self.length_df = len(self.df)
         self.df["idx"] = self.df.emoji_ids
-        self.df = self.df.explode(column="idx")
-        self.gdf = self.df.groupby(by="idx")
+        self.edf = self.df.explode(column="idx")
+        self.unique_emojis = self.edf["idx"].unique()
+        self.edf = self.edf.set_index("idx")
 
         self.batch_size = batch_size
         self.limit = limit
         self.text_col = text_col
+        self.shuffle = shuffle
+
+    def get_lists(self):
+        labels = self.df.emoji_ids.tolist()
+        text = self.df[self.text_col].tolist()
+        return text, labels
 
     def __iter__(self):
+        if self.shuffle:
+            self.df = self.df.sample(frac=1)
+        text, labels = self.get_lists()
+
         limit = (
-            min(self.length_df, self.limit)
-            if self.limit is not None
-            else self.length_df
+            min(len(self.df), self.limit) if self.limit is not None else len(self.df)
         )
-        for _ in range(0, limit, self.batch_size):
-            samples = self.gdf.sample()
-            sample = samples.sample(self.batch_size)
-            yield sample[self.text_col].tolist(), sample.emoji_ids.tolist()
+        batch_size_half = self.batch_size // 2
+        for start in range(0, limit, batch_size_half):
+            end = min(start + batch_size_half, limit)
+
+            sample_emojis = np.random.choice(self.unique_emojis, batch_size_half)
+            sample = self.edf.loc[sample_emojis].groupby(by="idx").sample()
+
+            batch_text = sample[self.text_col].tolist() + text[start:end]
+            batch_label = sample.emoji_ids.tolist() + labels[start:end]
+
+            yield batch_text, batch_label
 
     def __len__(self):
-        return self.length_df
+        return len(self.df)
 
 
 if __name__ == "__main__":
