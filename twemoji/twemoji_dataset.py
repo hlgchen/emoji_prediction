@@ -105,7 +105,6 @@ class TwemojiDataChunks:
             c = edf.idx.value_counts()
             c = c[c < 2000]
             balance_df = edf.loc[edf.idx.isin(c.index)]
-            balance_df = balance_df.set_index("idx")
             self.data_ls = [
                 TwemojiBalancedData(
                     df,
@@ -159,10 +158,10 @@ class TwemojiBalancedData:
         )
         self.df["idx"] = self.df.emoji_ids
         self.edf = self.df.explode(column="idx")
-        self.edf = self.edf.set_index("idx")
         if balance_df is not None:
             self.edf = pd.concat([self.edf, balance_df])
 
+        self.edf = self.edf.set_index("idx")
         self.unique_emojis = self.edf.index.unique()
 
         self.batch_size = batch_size
