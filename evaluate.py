@@ -52,7 +52,7 @@ def get_outputs(model, X, restriction_type=None):
         else:
             excluded_emojis = TRAIN_IDX
         mask_idx = [int(i not in excluded_emojis) for i in TEST_IDX]
-        mask_idx = torch.tensor([mask_idx for _ in range(len(X))])
+        mask_idx = torch.tensor([mask_idx for _ in range(len(X))]).to(device)
         outputs = outputs * mask_idx
     return outputs
 
