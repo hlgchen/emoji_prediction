@@ -3,7 +3,7 @@ import torch
 
 from twemoji.twemoji_dataset import TwemojiData, TwemojiBalancedData, TwemojiDataChunks
 from embert import SimpleSembert
-from pprint import pprint
+import pprint
 from tqdm import tqdm
 
 
@@ -63,22 +63,31 @@ def get_accuracy(p_emoji_ids, t_emoji_ids):
 
 
 if __name__ == "__main__":
-    # dataset = "test_v2"
+    dataset = "test_v2"
     # dataset = "balanced_test_v2"
-    dataset = "valid_v2"
+    # dataset = "valid_v2"
 
     config = {
         "weighting1": [0.5, 0.5],
         "weighting5": [3, 2],
-        "weighting10": [5, 5],
-        "weighting100": [50, 50],
+        "weighting10": [6, 4],
+        "weighting100": [60, 40],
     }
 
-    data = TwemojiData(dataset)
+    data = TwemojiData(dataset, batch_size=16, nrows=128000)
 
     model1 = get_model()
     model2 = get_model(balanced=True)
     counter = 0
+
+    sum_accuracies = {}
+    for i in [1, 5, 10, 100]:
+        sum_accuracies[f"e{i}"] = 0
+        sum_accuracies[f"m1_{i}"] = 0
+        sum_accuracies[f"m2_{i}"] = 0
+        sum_accuracies[f"c5"] = 0
+        sum_accuracies[f"c10"] = 0
+        sum_accuracies[f"c100"] = 0
 
     with tqdm(enumerate(data)) as tbatch:
         for _, batch in tbatch:
@@ -108,16 +117,19 @@ if __name__ == "__main__":
             p = get_combined_prediction(pred1, pred2, config["weighting100"])
             accuracy_dict["c100"] = get_accuracy(p, y)
 
-            accuracy_dict = {
-                k: accuracy_dict[k] + len(X) * v for k, v in accuracy_dict.items()
+            sum_accuracies = {
+                k: sum_accuracies[k] + len(X) * v for k, v in accuracy_dict.items()
             }
             counter += len(X)
-            running_accuracies = {k: v / counter for k, v in accuracy_dict.items()}
+            running_accuracies = {k: v / counter for k, v in sum_accuracies.items()}
 
             tbatch.set_postfix(**running_accuracies)
 
-    pprint(running_accuracies)
+    pprint.pprint(running_accuracies)
     save_path = os.path.join(get_project_root(), f"evaluation")
     file_path = os.path.join(save_path, f"evaluation_combined.txt")
     with open(file_path, "a+") as f:
-        f.write(running_accuracies)
+        f.write(dataset + "\n")
+        f.write(pprint.pformat(config, indent=4) + "\n")
+        f.write(pprint.pformat(running_accuracies, indent=4))
+        f.write("\n\n\n")
