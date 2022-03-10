@@ -175,10 +175,7 @@ if __name__ == "__main__":
     )
     model = SimpleSembert()
     model = model.to(device)
-    if pretrained_path is not None:
-        model.load_state_dict(torch.load(pretrained_path, map_location=device))
-        start_chunk = int(re.findall(r"\d+", pretrained_path.split("/")[-1])[0])
-        print(f"loaded pretrained params from: {pretrained_path}")
+    model.load_state_dict(torch.load(pretrained_path, map_location=device))
     model.eval()
     # pprint(model)
 
