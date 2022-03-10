@@ -59,14 +59,14 @@ def mean_pooling(model_output, attention_mask):
 
 class Baseline(nn.Module):
     def __init__(self):
-        super(VerySimpleSembert, self).__init__()
+        super(Baseline, self).__init__()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=False, bert=True, wordvector=False),
             requires_grad=False,
         )
         self.emoji_embedding_size = self.emoji_embeddings.size(1)
 
-        model_name = "all-distilroberta-v1"
+        model_name = "all-mpnet-base-v1"
         self.model = SentenceTransformer(model_name)
         for _, params in self.model.named_parameters():
             params.requires_grad = False
