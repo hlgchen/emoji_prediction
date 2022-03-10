@@ -64,7 +64,8 @@ def get_accuracy(p_emoji_ids, t_emoji_ids):
 
 if __name__ == "__main__":
     # dataset = "test_v2"
-    dataset = "balanced_test_v2"
+    # dataset = "balanced_test_v2"
+    dataset = "valid_v2"
 
     config = {
         "weighting1": [0.5, 0.5],
@@ -116,3 +117,7 @@ if __name__ == "__main__":
             tbatch.set_postfix(**running_accuracies)
 
     pprint(running_accuracies)
+    save_path = os.path.join(get_project_root(), f"evaluation")
+    file_path = os.path.join(save_path, f"evaluation_combined.txt")
+    with open(file_path, "a+") as f:
+        f.write(running_accuracies)
