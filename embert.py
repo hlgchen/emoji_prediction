@@ -83,7 +83,6 @@ class Baseline(nn.Module):
         X_2 = emoji_embeddings.repeat(len(sentence_ls), 1)
 
         out = (X_1 * X_2).sum(dim=1).view(-1, len(emoji_ids))
-        out = F.softmax(out, dim=1)
 
         return out
 
@@ -128,7 +127,6 @@ class LiteralModel(nn.Module):
             )[0]
             out.append(dot)
         out = torch.stack(out)
-        out = F.softmax(out, dim=1)
 
         return out
 
