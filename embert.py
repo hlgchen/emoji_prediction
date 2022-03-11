@@ -128,6 +128,7 @@ class LiteralModel(nn.Module):
             )[0]
             out.append(dot)
         out = torch.stack(out)
+        out = F.softmax(out, dim=1)
 
         return out
 
