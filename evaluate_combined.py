@@ -1,8 +1,9 @@
+from lib2to3.pytree import Base
 import os
 import torch
 
 from twemoji.twemoji_dataset import TwemojiData, TwemojiBalancedData, TwemojiDataChunks
-from embert import SimpleSembert
+from embert import SimpleSembert, Baseline
 import pprint
 from tqdm import tqdm
 
@@ -41,15 +42,16 @@ def get_prediction(prediction, topk):
     return predcitions
 
 
-def get_combined_prediction(predictions1, predictions2, weighting, topk=None):
+def get_combined_prediction(prediction_ls, weighting, topk=None):
     if sum(weighting) == 1:
-        predictions = weighting[0] * predictions1 + weighting[1] * predictions2
+        predictions = sum([weighting[i] * pred for i, pred in enumerate(prediction_ls)])
         _, combined_predictions = torch.topk(predictions, topk, dim=-1)
     else:
-        _, p_emoji_ids1 = torch.topk(predictions1, weighting[0], dim=-1)
-        _, p_emoji_ids2 = torch.topk(predictions2, weighting[1], dim=-1)
-
-        combined_predictions = torch.cat([p_emoji_ids1, p_emoji_ids2], dim=1)
+        p_ls = [
+            torch.topk(pred, weighting[i], dim=-1)[1]
+            for i, pred in enumerate(prediction_ls)
+        ]
+        combined_predictions = torch.cat(p_ls, dim=1)
     return combined_predictions
 
 
@@ -68,16 +70,17 @@ if __name__ == "__main__":
     # dataset = "valid_v2"
 
     config = {
-        "weighting1": [0.5, 0.5],
-        "weighting5": [3, 2],
-        "weighting10": [6, 4],
-        "weighting100": [60, 40],
+        "weighting1": [0.4, 0.3, 0.3],
+        "weighting5": [2, 2, 1],
+        "weighting10": [5, 3, 2],
+        "weighting100": [60, 30, 10],
     }
 
     data = TwemojiData(dataset, batch_size=16, nrows=128000)
 
     model1 = get_model()
     model2 = get_model(balanced=True)
+    model3 = Baseline()
     counter = 0
 
     sum_accuracies = {}
@@ -85,6 +88,7 @@ if __name__ == "__main__":
         sum_accuracies[f"e{i}"] = 0
         sum_accuracies[f"m1_{i}"] = 0
         sum_accuracies[f"m2_{i}"] = 0
+        sum_accuracies[f"m3_{i}"] = 0
         sum_accuracies[f"c5"] = 0
         sum_accuracies[f"c10"] = 0
         sum_accuracies[f"c100"] = 0
@@ -95,26 +99,29 @@ if __name__ == "__main__":
             y = batch[1]
             pred1 = model1(X, TEST_IDX)
             pred2 = model2(X, TEST_IDX)
+            pred3 = model3(X, TEST_IDX)
+            pred_ls = [pred1, pred2, pred3]
 
             accuracy_dict = {}
             # average weighting
             for i in [1, 5, 10, 100]:
-                p = get_combined_prediction(pred1, pred2, config["weighting1"], i)
+                p = get_combined_prediction(pred_ls, config["weighting1"], i)
                 accuracy_dict[f"e{i}"] = get_accuracy(p, y)
 
                 accuracy_dict[f"m1_{i}"] = get_accuracy(get_prediction(pred1, i), y)
                 accuracy_dict[f"m2_{i}"] = get_accuracy(get_prediction(pred2, i), y)
+                accuracy_dict[f"m3_{i}"] = get_accuracy(get_prediction(pred2, i), y)
 
             # weighting 5
-            p = get_combined_prediction(pred1, pred2, config["weighting5"])
+            p = get_combined_prediction(pred_ls, config["weighting5"])
             accuracy_dict["c5"] = get_accuracy(p, y)
 
             # weighting 10
-            p = get_combined_prediction(pred1, pred2, config["weighting10"])
+            p = get_combined_prediction(pred_ls, config["weighting10"])
             accuracy_dict["c10"] = get_accuracy(p, y)
 
             # weighting 100
-            p = get_combined_prediction(pred1, pred2, config["weighting100"])
+            p = get_combined_prediction(pred_ls, config["weighting100"])
             accuracy_dict["c100"] = get_accuracy(p, y)
 
             sum_accuracies = {
