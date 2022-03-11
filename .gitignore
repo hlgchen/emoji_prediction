@@ -16,3 +16,5 @@ twemoji/data
 *checkpoint*
 
 trained_models/*
+evaluation/
+twemoji/custom_scrape
