@@ -213,6 +213,7 @@ if __name__ == "__main__":
             os.makedirs(save_path)
 
         s = f"Evaluation with model: {model_name} on dataset {dataset_name} with nrows: {nrows}, restricted to 1 emoji {l1}\n"
+        s += f"restricted_type {restricted_type} \n"
         s += f"Accuracy is {total_accuracy}\n\n"
 
         file_path = os.path.join(save_path, f"evaluation.txt")
