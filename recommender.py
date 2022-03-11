@@ -33,7 +33,7 @@ def get_sembert_dropout_model(balanced=False):
 
 
 class EREC(nn.Module):
-    def __init__(self, mapping_dict, l_threshold=0.3):
+    def __init__(self, mapping_dict=None, l_threshold=0.3):
         super(EREC, self).__init__()
         self.e_model1 = get_sembert_dropout_model(balanced=False)
         self.e_model2 = get_sembert_dropout_model(balanced=True)

@@ -1,9 +1,9 @@
-from lib2to3.pytree import Base
 import os
 import torch
+import pandas as pd
 
 from twemoji.twemoji_dataset import TwemojiData, TwemojiBalancedData, TwemojiDataChunks
-from embert import SimpleSembert, Baseline
+from recommender import EREC
 import pprint
 from tqdm import tqdm
 
@@ -19,47 +19,11 @@ TRAIN_IDX = list(range(1711))
 TEST_IDX = list(range(1810))
 
 
-def get_model(balanced=False):
-    model = SimpleSembert(dropout=0.2)
-    model = model.to(device)
-    if balanced:
-        pretrained_path = os.path.join(
-            get_project_root(),
-            "trained_models/balanced_sembert_dropout/balanced_sembert_dropout_chunk106.ckpt",
-        )
-    else:
-        pretrained_path = os.path.join(
-            get_project_root(),
-            "trained_models/sembert_dropout/sembert_dropout_chunk77.ckpt",
-        )
-    model.load_state_dict(torch.load(pretrained_path, map_location=device))
-    model.eval()
-    return model
-
-
-def get_prediction(prediction, topk):
-    _, predcitions = torch.topk(prediction, topk, dim=-1)
-    return predcitions
-
-
-def get_combined_prediction(prediction_ls, weighting, topk=None):
-    if sum(weighting) == 1:
-        predictions = sum([weighting[i] * pred for i, pred in enumerate(prediction_ls)])
-        _, combined_predictions = torch.topk(predictions, topk, dim=-1)
-    else:
-        p_ls = [
-            torch.topk(pred, weighting[i], dim=-1)[1]
-            for i, pred in enumerate(prediction_ls)
-        ]
-        combined_predictions = torch.cat(p_ls, dim=1)
-    return combined_predictions
-
-
 def get_accuracy(p_emoji_ids, t_emoji_ids):
     accuracy = 0
     for i in range(len(p_emoji_ids)):
         y = set(t_emoji_ids[i])
-        predicted_emojis = set(p_emoji_ids[i].tolist())
+        predicted_emojis = p_emoji_ids[i]
         accuracy += (1 / len(p_emoji_ids)) * (len(predicted_emojis.intersection(y)) > 0)
     return accuracy
 
@@ -70,59 +34,42 @@ if __name__ == "__main__":
     # dataset = "valid_v2"
 
     config = {
-        "weighting1": [0.4, 0.3, 0.3],
-        "weighting5": [2, 2, 1],
-        "weighting10": [5, 3, 2],
-        "weighting100": [60, 30, 10],
+        1: (1, 0),
+        5: (3, 2),
+        10: (7, 3),
+        100: (90, 10),
     }
 
-    data = TwemojiData(dataset, batch_size=16, nrows=128000)
+    data = TwemojiData(dataset, batch_size=32, nrows=128000)
 
-    model1 = get_model()
-    model2 = get_model(balanced=True)
-    model3 = Baseline()
-    counter = 0
+    # description_path = os.path.join(
+    #     get_project_root(), "emoji_embedding/data/processed/emoji_descriptions.csv"
+    # )
+    # df_des = pd.read_csv(description_path, usecols=["emoji_id", "emoji_char"])
+    # mapping_dict = {k: v for k, v in zip(df_des.emoji_id, df_des.emoji_char)}
+    model = EREC()
 
     sum_accuracies = {}
     for i in [1, 5, 10, 100]:
         sum_accuracies[f"e{i}"] = 0
-        sum_accuracies[f"m1_{i}"] = 0
-        sum_accuracies[f"m2_{i}"] = 0
-        sum_accuracies[f"m3_{i}"] = 0
-        sum_accuracies[f"c5"] = 0
-        sum_accuracies[f"c10"] = 0
-        sum_accuracies[f"c100"] = 0
+
+    counter = 0
 
     with tqdm(enumerate(data)) as tbatch:
         for _, batch in tbatch:
             X = batch[0]
             y = batch[1]
-            pred1 = model1(X, TEST_IDX)
-            pred2 = model2(X, TEST_IDX)
-            pred3 = model3(X, TEST_IDX)
-            pred_ls = [pred1, pred2, pred3]
 
-            accuracy_dict = {}
-            # average weighting
-            for i in [1, 5, 10, 100]:
-                p = get_combined_prediction(pred_ls, config["weighting1"], i)
-                accuracy_dict[f"e{i}"] = get_accuracy(p, y)
+            e_preds, l_preds = model(X)
 
-                accuracy_dict[f"m1_{i}"] = get_accuracy(get_prediction(pred1, i), y)
-                accuracy_dict[f"m2_{i}"] = get_accuracy(get_prediction(pred2, i), y)
-                accuracy_dict[f"m3_{i}"] = get_accuracy(get_prediction(pred2, i), y)
-
-            # weighting 5
-            p = get_combined_prediction(pred_ls, config["weighting5"])
-            accuracy_dict["c5"] = get_accuracy(p, y)
-
-            # weighting 10
-            p = get_combined_prediction(pred_ls, config["weighting10"])
-            accuracy_dict["c10"] = get_accuracy(p, y)
-
-            # weighting 100
-            p = get_combined_prediction(pred_ls, config["weighting100"])
-            accuracy_dict["c100"] = get_accuracy(p, y)
+            accuracy_dict = dict()
+            for k, dist in config.items():
+                preds = [set(l[: dist[1]]) for l in l_preds]
+                for j, e in enumerate(e_preds):
+                    e_copy = e.copy()
+                    while len(preds[j]) < k:
+                        preds[j].add(e_copy.pop(0))
+                accuracy_dict[f"e{k}"] = get_accuracy(preds, y)
 
             sum_accuracies = {
                 k: sum_accuracies[k] + len(X) * v for k, v in accuracy_dict.items()
