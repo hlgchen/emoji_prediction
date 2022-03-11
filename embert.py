@@ -88,6 +88,50 @@ class Baseline(nn.Module):
         return out
 
 
+class LiteralModel(nn.Module):
+    def __init__(self):
+        super(LiteralModel, self).__init__()
+        description_path = os.path.join(
+            get_project_root(), "emoji_embedding/data/processed/emoji_descriptions.csv"
+        )
+        df = pd.read_csv(description_path, usecols=["emjpd_emoji_name_og"])
+
+        model_name = "all-MiniLM-L6-v2"
+        self.model = SentenceTransformer(model_name)
+        for _, params in self.model.named_parameters():
+            params.requires_grad = False
+        self.sentence_embedding_size = 384
+
+        self.emoji_embeddings = nn.Parameter(
+            self.model.encode(
+                df.emjpd_emoji_name_og.tolist(),
+                show_progress_bar=True,
+                normalize_embeddings=True,
+                convert_to_tensor=True,
+            ),
+            requires_grad=False,
+        )
+        self.emoji_embedding_size = self.emoji_embeddings.size(1)
+
+    def forward(self, sentence_ls, emoji_ids):
+
+        out = []
+        for sentence in sentence_ls:
+            X = sentence.split(" ")
+            X_tensor = self.model.encode(
+                X,
+                normalize_embeddings=True,
+                convert_to_tensor=True,
+            )
+            dot = (X_tensor @ self.emoji_embeddings[emoji_ids].transpose(0, 1)).max(
+                dim=0
+            )[0]
+            out.append(dot)
+        out = torch.stack(out)
+
+        return out
+
+
 class SimpleEmbert(nn.Module):
     def __init__(self, mode="avg"):
         super(SimpleEmbert, self).__init__()
