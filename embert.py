@@ -22,6 +22,18 @@ def get_project_root():
 
 
 def get_emoji_fixed_embedding(image=True, bert=True, wordvector=False):
+    """
+    Returns concatenated pretrained embeddings.
+    Params:
+        - image {bool}: if True image embeddings are part of the concatenation
+                        Note that these embeddings are NOT normalized --> shape (n_emojis, 768)
+        - bert {bool}: if True bert description embeddings are part of the concatenation
+                        Note that these embeddings are normalized --> shape (n_emojis, 200)
+        - wordvector {bool}: if True glove word average embeddings (of the emoji descriptions)
+                            are part of the concatenation (glove-twitter-200) --> shape (n_emojis, 200)
+    Returns:
+        - emoji_embeddings {torch.Tensor}: tensor of concatenated embeddings of all emojis
+    """
 
     base_path = os.path.join(get_project_root(), "emoji_embedding/data/processed")
     emb_paths = []
@@ -43,6 +55,13 @@ def get_emoji_fixed_embedding(image=True, bert=True, wordvector=False):
 
 
 def mean_pooling(model_output, attention_mask):
+    """
+    Takes model output of bert model on token level
+    (either as direct sentence bert output or as tensor),
+    along with attention mask and calculates the mean of the tensors.
+
+    This represents the sentence embedding of a sentence.
+    """
     if not isinstance(model_output, torch.Tensor):
         token_embeddings = model_output[
             0
@@ -58,6 +77,12 @@ def mean_pooling(model_output, attention_mask):
 
 
 class Baseline(nn.Module):
+    """
+    Baseline Sentence BERT emoji prediction model. It encodes each tweet with
+    "all-mpnet-base-v1" and takes the dot product of the embedding with embeddings of
+    emoji descriptions. The dot product with each emoji is returned.
+    """
+
     def __init__(self):
         super(Baseline, self).__init__()
         self.emoji_embeddings = nn.Parameter(
@@ -73,6 +98,12 @@ class Baseline(nn.Module):
         self.sentence_embedding_size = 768
 
     def forward(self, sentence_ls, emoji_ids):
+        """
+        Returns dot product of encoded sentence with each emoji embedding.
+        Params:
+            - sentence_ls {list}: list of string sentences
+            - emoji_ids {list}: list of emoji ids for comparisson
+        """
 
         sentence_embeddings = self.model.encode(
             sentence_ls, normalize_embeddings=True, convert_to_tensor=True
@@ -88,6 +119,14 @@ class Baseline(nn.Module):
 
 
 class LiteralModel(nn.Module):
+    """
+    Baseline word level BERT emoji prediction model. It takes the average embedding of words in emoji names
+    (embeddings calculated with "all-MiniLM-L6-v2") and compares those with "all-MiniLM-L6-v2" embeddings of each
+    word in a tweet. Returns the similarity between tweet and emojis as the maximum word similarity of any word
+    in a tweet and the average emoji name embedding. (Note that I didn't use glove vectors, because these have
+    performed quite bad when there is spelling issues or small word changes.)
+    """
+
     def __init__(self):
         super(LiteralModel, self).__init__()
         description_path = os.path.join(
@@ -132,6 +171,14 @@ class LiteralModel(nn.Module):
 
 
 class SimpleEmbert(nn.Module):
+    """
+    DistilBERT based emoji prediction model (Emoji-BERT). Has a  "distilbert-base-uncased" as
+    basemodel, which is finetuned with training. DistilBERT encodes tweets. Encoded tweets are projected
+    into a 500 dimensional space, just like the embeddings for emojis (which are calculated beforehand).
+    The dot product within this 500 dimensional space is the similarity.
+    Finally the similarity score is passed through a softmax layer.
+    """
+
     def __init__(self, mode="avg"):
         super(SimpleEmbert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
@@ -186,6 +233,18 @@ class SimpleEmbert(nn.Module):
 
 
 class SimpleSembert(nn.Module):
+    """
+    SentenceBERT based emoji prediction model (Sentence-Emoji-BERT). Has a  "all-distilroberta-v1" as
+    basemodel, which is finetuned with training. SentenceBERT encodes tweets. Encoded tweets are projected
+    into a 500 dimensional space, just like the embeddings for emojis (which are calculated beforehand).
+    The dot product within this 500 dimensional space is the similarity.
+    Finally the similarity score is passed through a softmax layer.
+
+    In this model there is an option to specify a dropout parameter. If no dropout float value is provided
+    NO dropout layer is added. Otherwise there is. Be careful when loading finetuned models, add a dropout layer to model
+    definition if model had been trained with dropout.
+    """
+
     def __init__(self, dropout=None):
         super(SimpleSembert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
@@ -241,6 +300,16 @@ class SimpleSembert(nn.Module):
 
 
 class VerySimpleSembert(nn.Module):
+    """
+    SentenceBERT based emoji prediction model (Sentence-Emoji-BERT). Has a  "all-distilroberta-v1" as
+    basemodel, which is NOT finetuned with training. SentenceBERT encodes tweets. Encoded tweets are projected
+    into a 500 dimensional space, just like the embeddings for emojis (which are calculated beforehand).
+    The dot product within this 500 dimensional space is the similarity.
+    Finally the similarity score is passed through a softmax layer.
+
+    Note that in this version only the linear projection layers are trainable.
+    """
+
     def __init__(self):
         super(VerySimpleSembert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
@@ -292,6 +361,7 @@ def get_emoji_descriptions():
     return s_ls
 
 
+# currently this model has not been used
 class Sembert(nn.Module):
     def __init__(self):
         super(Sembert, self).__init__()
@@ -384,6 +454,10 @@ class Sembert(nn.Module):
 
 
 class EmbertLoss(nn.Module):
+    """Custom loss function, inspired by triplet loss. Incentivizes model to lift up probabilities for
+    emojis appearing with texts and push down those for all other emojis.Doesn't require us to find hard negatives.
+    """
+
     def __init__(self):
         super(EmbertLoss, self).__init__()
 
@@ -399,6 +473,9 @@ class EmbertLoss(nn.Module):
 
 
 class Accuracy(nn.Module):
+    """Custom Accuracy function. For each tweet the same number of emojis are considered for prediction
+    as number of emojis that actually appear. The accuracy is the average accuracy of predictions for each sentence."""
+
     def __init__(self):
         super(Accuracy, self).__init__()
 

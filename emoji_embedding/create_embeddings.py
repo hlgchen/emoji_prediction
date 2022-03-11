@@ -224,7 +224,11 @@ def create_word_vector_embeddings():
 # ************************ create description embedding via Sentence BERT***********************
 
 
-def create_distil_bert_embeddings():
+def create_sbert_embeddings():
+
+    """Creates Sentence bert embeddings for emojiname + aliases + main description
+    Using model "all-mpnet-base-v1" with normalization of output embeddings.
+    """
 
     print("creating sentence bert embeddings")
 
@@ -253,4 +257,4 @@ def create_distil_bert_embeddings():
 if __name__ == "__main__":
     create_vision_embedding()
     create_word_vector_embeddings()
-    create_distil_bert_embeddings()
+    create_sbert_embeddings()

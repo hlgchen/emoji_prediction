@@ -42,6 +42,7 @@ def mean_pooling(model_output, attention_mask):
     )
 
 
+# code not used as of now
 class DescriptionSembert(nn.Module):
     def __init__(self, pretrained_path=None):
         super(DescriptionSembert, self).__init__()
