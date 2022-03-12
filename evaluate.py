@@ -1,4 +1,3 @@
-from lib2to3.pytree import Base
 import os
 from pprint import pprint
 import numpy as np
@@ -7,7 +6,7 @@ import torch
 import pandas as pd
 from tqdm import tqdm
 
-from embert import Accuracy, SimpleSembert, TopKAccuracy, Baseline
+from embert import Accuracy, Sembert, TopKAccuracy, Baseline
 from twemoji.twemoji_dataset import TwemojiData
 import re
 import argparse
@@ -177,7 +176,7 @@ if __name__ == "__main__":
     if model_name == "baseline":
         model = Baseline().to(device)
     else:
-        model = SimpleSembert().to(device)
+        model = Sembert().to(device)
         model.load_state_dict(torch.load(pretrained_path, map_location=device))
     model.eval()
     # pprint(model)

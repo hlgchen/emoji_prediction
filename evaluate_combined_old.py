@@ -1,9 +1,8 @@
-from lib2to3.pytree import Base
 import os
 import torch
 
-from twemoji.twemoji_dataset import TwemojiData, TwemojiBalancedData, TwemojiDataChunks
-from embert import SimpleSembert, Baseline
+from twemoji.twemoji_dataset import TwemojiData
+from embert import Sembert, Baseline
 import pprint
 from tqdm import tqdm
 
@@ -20,7 +19,7 @@ TEST_IDX = list(range(1810))
 
 
 def get_model(balanced=False):
-    model = SimpleSembert(dropout=0.2)
+    model = Sembert(dropout=0.2)
     model = model.to(device)
     if balanced:
         pretrained_path = os.path.join(

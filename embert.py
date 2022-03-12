@@ -169,7 +169,7 @@ class LiteralModel(nn.Module):
         return out
 
 
-class SimpleEmbert(nn.Module):
+class Embert(nn.Module):
     """
     DistilBERT based emoji prediction model (Emoji-BERT). Has a  "distilbert-base-uncased" as
     basemodel, which is finetuned with training. DistilBERT encodes tweets. Encoded tweets are projected
@@ -179,7 +179,7 @@ class SimpleEmbert(nn.Module):
     """
 
     def __init__(self, mode="avg"):
-        super(SimpleEmbert, self).__init__()
+        super(Embert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=True, bert=True, wordvector=False),
             requires_grad=False,
@@ -231,7 +231,7 @@ class SimpleEmbert(nn.Module):
         return out
 
 
-class SimpleSembert(nn.Module):
+class Sembert(nn.Module):
     """
     SentenceBERT based emoji prediction model (Sentence-Emoji-BERT). Has a  "all-distilroberta-v1" as
     basemodel, which is finetuned with training. SentenceBERT encodes tweets. Encoded tweets are projected
@@ -245,7 +245,7 @@ class SimpleSembert(nn.Module):
     """
 
     def __init__(self, dropout=None):
-        super(SimpleSembert, self).__init__()
+        super(Sembert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=True, bert=True, wordvector=False),
             requires_grad=False,
@@ -298,7 +298,7 @@ class SimpleSembert(nn.Module):
         return out
 
 
-class VerySimpleSembert(nn.Module):
+class SimpleSembert(nn.Module):
     """
     SentenceBERT based emoji prediction model (Sentence-Emoji-BERT). Has a  "all-distilroberta-v1" as
     basemodel, which is NOT finetuned with training. SentenceBERT encodes tweets. Encoded tweets are projected
@@ -310,7 +310,7 @@ class VerySimpleSembert(nn.Module):
     """
 
     def __init__(self):
-        super(VerySimpleSembert, self).__init__()
+        super(SimpleSembert, self).__init__()
         self.emoji_embeddings = nn.Parameter(
             get_emoji_fixed_embedding(image=True, bert=True, wordvector=False),
             requires_grad=False,

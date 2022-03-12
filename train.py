@@ -5,7 +5,7 @@ import torch
 from tqdm import tqdm
 
 from emoji_embedding.utils import model_summary
-from embert import EmbertLoss, Accuracy, SimpleSembert
+from embert import EmbertLoss, Accuracy, Sembert
 from twemoji.twemoji_dataset import TwemojiData, TwemojiDataChunks
 import re
 import logging
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
     # pretrained_path = "/content/drive/MyDrive/cs224n_project/trained_models/sembert_cased_min2/sembert_chunk2.ckpt"
     pretrained_path = None
-    model = SimpleSembert()
+    model = Sembert()
     model.train()
     model = model.to(device)
     start_chunk = 0

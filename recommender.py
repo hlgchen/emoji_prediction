@@ -2,7 +2,7 @@ import os
 
 import torch
 import torch.nn as nn
-from embert import Baseline, LiteralModel, SimpleSembert
+from embert import Baseline, LiteralModel, Sembert
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 TRAIN_IDX = list(range(1711))
@@ -15,7 +15,7 @@ def get_project_root():
 
 
 def get_sembert_dropout_model(balanced=False):
-    model = SimpleSembert(dropout=0.2)
+    model = Sembert(dropout=0.2)
     model = model.to(device)
     if balanced:
         pretrained_path = os.path.join(
