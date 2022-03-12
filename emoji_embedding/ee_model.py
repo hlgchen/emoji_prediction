@@ -42,37 +42,6 @@ def mean_pooling(model_output, attention_mask):
     )
 
 
-# code not used as of now
-class DescriptionSembert(nn.Module):
-    def __init__(self, pretrained_path=None):
-        super(DescriptionSembert, self).__init__()
-
-        model_name = "all-MiniLM-L6-v2"
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            f"sentence-transformers/{model_name}"
-        )
-        self.model = AutoModel.from_pretrained(f"sentence-transformers/{model_name}")
-        if pretrained_path is not None:
-            self.load_state_dict(torch.load(pretrained_path, map_location=device))
-
-    def forward(self, description_ls):
-        encoded_input = self.tokenizer(
-            description_ls,
-            padding=True,
-            truncation=True,
-            return_tensors="pt",
-            max_length=256,
-        )
-
-        input_ids = encoded_input["input_ids"].to(device)
-        attention_mask = encoded_input["attention_mask"].to(device)
-        model_output = self.model(input_ids=input_ids, attention_mask=attention_mask)
-        embeddings = mean_pooling(model_output, attention_mask)
-        sentence_embeddings = F.normalize(embeddings, p=2, dim=1)
-
-        return sentence_embeddings
-
-
 class ContrastiveLoss(torch.nn.Module):
     """
     Contrastive loss function.
