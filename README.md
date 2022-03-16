@@ -2,12 +2,20 @@
 
 This repository contains the code to train and test emoji recommendation models. 
 
+contributors: 
+
+- @hlgchen
+- @isabellelimxr
+- @janani2098
+
+
 To train models on a GPU install requirements with pip in `gpu_requirements.txt`
 
 All required dependencies are in `requirements.txt`
 
 
 The dataset used for training is aquired from the paper Cappallo et al. (2018) [1].
+
 
 ### Example predictions
 
