@@ -83,3 +83,14 @@ class EREC(nn.Module):
             ]
 
         return recs_e, recs_l
+    
+    def recommend(self, X, e_n, l_n): 
+        recs_e, recs_l = self.forward(X)
+        recs = []
+        for i in range(len(X)): 
+            n_l_recs = min(len(recs_l[i]), l_n)
+            r_r = [e for e in recs_e[i] if e not in recs_l[i][:l_n]]
+            r =  r_r[:(e_n + l_n -n_l_recs)]+ recs_l[i][:l_n]
+            recs.append(r)
+        return recs
+        
